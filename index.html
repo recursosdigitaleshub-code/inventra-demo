@@ -1,0 +1,3431 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Inventra AI · Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text x='0' y='13' font-size='14'>📦</text></svg>" />
+<style>
+:root {
+  --bg:#0f172a; --surface:#fff; --surface-2:#f8fafc; --surface-3:#f1f5f9;
+  --border:#e2e8f0; --text:#0f172a; --muted:#64748b;
+  --primary:#2563eb; --primary-hover:#1d4ed8; --primary-soft:#eff6ff;
+  --success:#16a34a; --success-soft:#dcfce7;
+  --warning:#d97706; --warning-soft:#fef3c7;
+  --danger:#dc2626;  --danger-soft:#fee2e2;
+  --radius:8px; --radius-lg:12px;
+  --shadow-sm:0 1px 2px rgba(15,23,42,.06); --shadow:0 4px 12px rgba(15,23,42,.08);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--surface-2);color:var(--text);font-size:14px;line-height:1.5}
+a{color:var(--primary);text-decoration:none}
+a:hover{text-decoration:underline}
+h1,h2,h3{margin:0 0 12px;font-weight:600}
+h1{font-size:22px} h2{font-size:18px} h3{font-size:16px}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--surface-3);padding:1px 6px;border-radius:4px}
+
+/* shell */
+.shell{display:flex;min-height:100vh}
+.sidebar{width:240px;min-width:240px;background:#0f172a;color:#e2e8f0;display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
+.brand{display:flex;gap:10px;align-items:center;padding:20px 16px;border-bottom:1px solid #1e293b}
+.brand-icon{font-size:24px}
+.brand-title{font-weight:700;font-size:15px}
+.brand-sub{font-size:11px;color:#94a3b8}
+.nav{display:flex;flex-direction:column;gap:2px;padding:16px 8px;flex:1}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;color:#cbd5e1;cursor:pointer;font-size:14px;position:relative;user-select:none}
+.nav-item:hover{background:#1e293b;color:#fff}
+.nav-item.active{background:#2563eb;color:#fff;font-weight:500}
+.nav-icon{width:18px;text-align:center}
+.nav-label{flex:1}
+.nav-badge{background:#dc2626;color:#fff;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600}
+.sidebar-footer{padding:12px;border-top:1px solid #1e293b}
+.sidebar-footer .btn{width:100%;color:#cbd5e1;background:transparent;border-color:transparent}
+.sidebar-footer .btn:hover{background:#1e293b;color:#fff}
+.main{flex:1;overflow-x:auto}
+
+/* page */
+.page{padding:24px 32px;max-width:1400px}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-title{font-size:22px;font-weight:600;margin:0}
+.page-subtitle{color:var(--muted);font-size:13px;margin-top:2px}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.card + .card{margin-top:16px}
+
+/* grid */
+.grid{display:grid;gap:16px}
+.grid-4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.grid-2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.row-between{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.spacer{flex:1}
+
+/* button */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--border);font-size:14px;font-weight:500;cursor:pointer;transition:all 150ms;background:var(--surface);color:var(--text);font-family:inherit}
+.btn:hover:not(:disabled){background:var(--surface-3)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn-primary:hover:not(:disabled){background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn-sm{padding:6px 10px;font-size:12px}
+
+/* form */
+.form-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:13px;font-weight:500}
+.field .required::after{content:" *";color:var(--danger)}
+.field input,.field select,.field textarea{padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text);font-family:inherit}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.field.invalid input,.field.invalid select{border-color:var(--danger)}
+.field .error{color:var(--danger);font-size:12px}
+.field .hint{color:var(--muted);font-size:12px}
+
+/* table */
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px}
+.table th{font-weight:600;color:var(--muted);background:var(--surface-2);font-size:12px;text-transform:uppercase;letter-spacing:.02em}
+.table tbody tr:hover{background:var(--surface-2)}
+.table td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+/* badges */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.badge-ok{background:var(--success-soft);color:var(--success)}
+.badge-warn{background:var(--warning-soft);color:var(--warning)}
+.badge-danger{background:var(--danger-soft);color:var(--danger)}
+.badge-info{background:var(--primary-soft);color:var(--primary)}
+.badge-muted{background:var(--surface-3);color:var(--muted)}
+
+/* toasts */
+.toast-container{position:fixed;top:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9999}
+.toast{background:var(--surface);border:1px solid var(--border);border-left-width:4px;padding:12px 16px;border-radius:var(--radius);box-shadow:var(--shadow);min-width:260px;animation:slideIn 200ms ease-out}
+.toast.success{border-left-color:var(--success)}
+.toast.error{border-left-color:var(--danger)}
+.toast.info{border-left-color:var(--primary)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+
+/* empty */
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty-icon{font-size:32px;margin-bottom:8px}
+
+/* stat */
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.stat-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:8px}
+.stat-value{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat-hint{color:var(--muted);font-size:12px;margin-top:4px}
+.stat-card.alert{border-left:4px solid var(--danger)}
+.stat-card.ok{border-left:4px solid var(--success)}
+
+/* modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px}
+.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:0 20px 60px rgba(15,23,42,.3);max-width:720px;width:100%;max-height:90vh;overflow:auto}
+.modal-header{padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-header h2{margin:0}
+.modal-body{padding:20px}
+.modal-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+.close-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:4px}
+.close-x:hover{background:var(--surface-3)}
+
+/* utilities */
+.mt-12{margin-top:12px} .mt-16{margin-top:16px} .mt-20{margin-top:20px}
+.w-100{width:100px} .text-muted{color:var(--muted)}
+.coverage-bar{background:var(--surface-3);border-radius:999px;height:6px;overflow:hidden;width:100px}
+.coverage-fill{height:100%}
+
+/* onboarding */
+.onboarding-layout{min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(135deg,#0f172a 0%,#1e3a8a 100%);color:#fff}
+.onb-header{padding:24px 32px;display:flex;align-items:center;gap:12px}
+.onb-logo{font-size:28px}
+.onb-brand{font-weight:700;font-size:18px}
+.onb-tagline{font-size:12px;color:#94a3b8}
+.onb-container{flex:1;display:flex;align-items:center;justify-content:center;padding:24px}
+.onb-card{background:#fff;color:var(--text);border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:720px;overflow:hidden}
+.onb-progress{display:flex;padding:20px 32px 0;gap:8px}
+.onb-step{flex:1;height:4px;background:var(--surface-3);border-radius:2px}
+.onb-step.done{background:var(--success)}
+.onb-step.current{background:var(--primary)}
+.onb-body{padding:32px}
+.onb-eyebrow{color:var(--primary);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.onb-title{font-size:24px;margin-bottom:8px}
+.onb-subtitle{color:var(--muted);margin-bottom:24px}
+.onb-footer{padding:16px 32px;background:var(--surface-2);border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.onb-step-label{font-size:12px;color:var(--muted)}
+
+/* vertical selector */
+.vertical-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px}
+.vertical-card{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;text-align:center;transition:all 150ms}
+.vertical-card:hover{border-color:var(--primary);background:var(--primary-soft)}
+.vertical-card.selected{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
+.vertical-icon{font-size:28px;margin-bottom:4px}
+.vertical-name{font-weight:500;font-size:13px}
+
+/* welcome */
+.welcome-hero{text-align:center;padding:40px 32px 32px}
+.welcome-icon{font-size:48px;margin-bottom:12px}
+.welcome-title{font-size:28px;margin-bottom:8px}
+.welcome-features{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-top:24px;padding:0 32px}
+.feature-item{text-align:left;display:flex;gap:10px;align-items:flex-start}
+.feature-check{color:var(--success);font-weight:700}
+.summary-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+.summary-row:last-child{border-bottom:none}
+.summary-label{color:var(--muted)}
+.summary-value{font-weight:500;text-align:right}
+.summary-section{margin-bottom:16px}
+.summary-section-title{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.05em;font-weight:600;margin-bottom:8px}
+
+/* ai / chat / insights */
+.fab{position:fixed;right:24px;bottom:24px;width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;border:none;box-shadow:0 10px 24px rgba(37,99,235,.4);cursor:pointer;font-size:24px;z-index:500;display:flex;align-items:center;justify-content:center;transition:transform 150ms}
+.fab:hover{transform:scale(1.08);background:var(--primary-hover)}
+.chat-drawer{position:fixed;right:24px;bottom:24px;width:380px;max-width:calc(100vw - 48px);height:580px;max-height:calc(100vh - 48px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 24px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;z-index:600;overflow:hidden}
+.chat-header{padding:14px 16px;background:var(--primary);color:#fff;display:flex;justify-content:space-between;align-items:center}
+.chat-header .close-x{color:#fff}
+.chat-header .close-x:hover{background:rgba(255,255,255,.15)}
+.chat-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)}
+.chat-msg{padding:9px 12px;border-radius:12px;max-width:88%;font-size:13px;line-height:1.5;word-wrap:break-word;white-space:pre-wrap}
+.chat-msg.user{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:3px}
+.chat-msg.bot{align-self:flex-start;background:var(--surface);border:1px solid var(--border);border-bottom-left-radius:3px}
+.chat-suggestions{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-top:1px solid var(--border);background:var(--surface)}
+.chat-chip{font-size:12px;padding:5px 10px;border-radius:999px;background:var(--surface-3);color:var(--text);border:1px solid var(--border);cursor:pointer;font-family:inherit}
+.chat-chip:hover{background:var(--primary-soft);border-color:var(--primary);color:var(--primary)}
+.chat-input{padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:6px;background:var(--surface)}
+.chat-input input{flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:13px}
+.chat-input input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+
+.health-hero{display:grid;grid-template-columns:auto 1fr;gap:20px;align-items:center}
+.health-gauge{position:relative;width:140px;height:140px;flex-shrink:0}
+.health-gauge svg{width:100%;height:100%;transform:rotate(-90deg)}
+.health-gauge-value{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700}
+.health-gauge-value .big{font-size:36px;line-height:1}
+.health-gauge-value .small{font-size:11px;color:var(--muted);margin-top:4px;font-weight:500}
+
+.abc-card{border-radius:10px;padding:16px;text-align:center}
+.abc-count{font-size:30px;font-weight:700;line-height:1}
+.abc-label{font-weight:600;margin-top:4px;font-size:13px}
+.abc-hint{font-size:11px;opacity:.75;margin-top:4px}
+
+.insight{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:14px 16px;border-radius:var(--radius);border-left:4px solid var(--border);background:var(--surface-2);margin-bottom:10px}
+.insight.danger{border-left-color:var(--danger);background:var(--danger-soft)}
+.insight.warning{border-left-color:var(--warning);background:var(--warning-soft)}
+.insight.info{border-left-color:var(--primary);background:var(--primary-soft)}
+.insight.success{border-left-color:var(--success);background:var(--success-soft)}
+.insight-icon{font-size:24px;width:32px;text-align:center;line-height:1}
+.insight-title{font-weight:600;margin-bottom:3px;font-size:14px}
+.insight-msg{font-size:13px;color:var(--text)}
+.insight-products{margin-top:8px;display:flex;flex-wrap:wrap;gap:5px}
+.insight-chip{font-size:11px;padding:3px 9px;background:rgba(255,255,255,.7);border:1px solid rgba(15,23,42,.08);border-radius:6px;color:var(--text)}
+
+.coverage-inline{display:inline-flex;align-items:center;gap:6px;font-size:12px}
+.coverage-dot{width:8px;height:8px;border-radius:50%}
+
+.explain{margin-top:14px;font-size:12.5px;color:var(--muted);border-top:1px dashed var(--border);padding-top:10px}
+.explain summary{cursor:pointer;font-weight:500;color:var(--primary);list-style:none;padding:4px 0;user-select:none}
+.explain summary::-webkit-details-marker{display:none}
+.explain summary::before{content:'ⓘ  '}
+.explain[open] summary::before{content:'▾  '}
+.explain summary:hover{text-decoration:underline}
+.explain ul{margin:8px 0 10px;padding-left:18px}
+.explain li{margin-bottom:5px;line-height:1.45}
+.explain p{margin:6px 0;line-height:1.5}
+.explain strong{color:var(--text)}
+.explain-bands{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.explain-band{display:inline-block;padding:2px 9px;border-radius:999px;font-weight:600;font-size:11px}
+
+.summary-card{display:flex;flex-direction:column;padding:14px;border-radius:8px;cursor:pointer;transition:transform 150ms,box-shadow 150ms;min-height:180px}
+.summary-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(15,23,42,.1)}
+.summary-card-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.summary-card-value{font-size:22px;font-weight:700;margin-top:4px;line-height:1.1}
+.summary-card-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.summary-card-list{flex:1;margin-top:10px;font-size:12.5px;line-height:1.4}
+.summary-card-item{display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid rgba(15,23,42,.06)}
+.summary-card-item-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.summary-card-item-val{color:var(--muted);font-size:11px;white-space:nowrap}
+.summary-card-more{color:var(--muted);font-size:11px;margin-top:6px;font-style:italic}
+.summary-card-ok{color:var(--success);font-size:12.5px;margin-top:10px;padding:6px 8px;background:rgba(22,163,74,.08);border-radius:6px}
+.summary-card-cta{font-size:11px;color:var(--primary);font-weight:600;margin-top:10px;padding-top:8px;border-top:1px solid rgba(15,23,42,.08)}
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div class="toast-container" id="toasts"></div>
+<div id="modal-root"></div>
+<div id="chat-root"></div>
+
+<script>
+/* ============================================================
+   INVENTRA AI — Prototipo funcional (vanilla JS + localStorage)
+   Arquitectura:
+   - Estado único en window.store
+   - Stock derivado de movements (nunca se almacena directo)
+   - Persistencia en localStorage
+   - Render reactivo: cualquier mutación llama a render()
+   ============================================================ */
+
+const LS_TENANT    = 'inventra.demo.tenant';
+const LS_USER      = 'inventra.demo.user';
+const LS_BRANCHES  = 'inventra.demo.branches';
+const LS_SETTINGS  = 'inventra.demo.settings';
+const LS_PRODUCTS  = 'inventra.demo.products';
+const LS_MOVEMENTS = 'inventra.demo.movements';
+
+const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+
+const MOVEMENT_LABELS = {
+  in: 'Entrada', out: 'Salida',
+  adjust_neg: 'Ajuste (−)', adjust_pos: 'Ajuste (+)'
+};
+const isIncoming = t => t === 'in' || t === 'adjust_pos';
+
+const VERTICALS = [
+  { code:'retail',   icon:'🏪', name:'Tienda',       desc:'Abarrotes, minimarket' },
+  { code:'bakery',   icon:'🧁', name:'Repostería',   desc:'Insumos y productos horneados' },
+  { code:'hardware', icon:'🔧', name:'Ferretería',   desc:'Herramientas y materiales' },
+  { code:'pharmacy', icon:'💊', name:'Farmacia',     desc:'Medicamentos con lote' },
+  { code:'petshop',  icon:'🐾', name:'Mascotas',     desc:'Alimento y accesorios' },
+  { code:'other',    icon:'📦', name:'Otro',         desc:'Configuración personalizada' },
+];
+
+const CURRENCIES = ['COP','USD','MXN','EUR','PEN','CLP','ARS','BRL'];
+const TIMEZONES  = ['America/Bogota','America/Mexico_City','America/Lima','America/Santiago','America/Buenos_Aires','America/Sao_Paulo','America/New_York','Europe/Madrid'];
+
+function defaultCategoriesFor(vertical) {
+  switch(vertical) {
+    case 'bakery': return [
+      { sku:'HAR-001', name:'Harina de trigo',      category:'Insumos secos', unit:'Kg',     minStock:5,   price:2.00,  currentStock:25 },
+      { sku:'AZU-001', name:'Azúcar blanca',        category:'Insumos secos', unit:'Kg',     minStock:5,   price:3.00,  currentStock:18 },
+      { sku:'HUE-001', name:'Huevos',               category:'Frescos',       unit:'Unidad', minStock:30,  price:0.35,  currentStock:120 },
+      { sku:'MAN-001', name:'Mantequilla',          category:'Lácteos',       unit:'Kg',     minStock:2,   price:8.00,  currentStock:6 },
+      { sku:'LEC-001', name:'Leche entera',         category:'Lácteos',       unit:'Litro',  minStock:6,   price:4.50,  currentStock:20 },
+      { sku:'VAI-001', name:'Esencia de vainilla',  category:'Saborizantes',  unit:'ml',     minStock:100, price:0.05,  currentStock:500 },
+      { sku:'CHO-001', name:'Chocolate cobertura',  category:'Saborizantes',  unit:'Kg',     minStock:2,   price:15.00, currentStock:5 },
+      { sku:'PHO-001', name:'Polvo para hornear',   category:'Insumos secos', unit:'Kg',     minStock:1,   price:10.00, currentStock:3 },
+    ];
+    case 'hardware': return [
+      { sku:'TOR-001', name:'Tornillo 1/4" x 1"',     category:'Tornillería',  unit:'Unidad', minStock:100, price:0.10,  currentStock:500 },
+      { sku:'TUE-001', name:'Tuerca 1/4"',             category:'Tornillería',  unit:'Unidad', minStock:100, price:0.05,  currentStock:400 },
+      { sku:'MAR-001', name:'Martillo 16oz',           category:'Herramientas', unit:'Unidad', minStock:5,   price:25.00, currentStock:12 },
+      { sku:'DES-001', name:'Destornillador Phillips', category:'Herramientas', unit:'Unidad', minStock:5,   price:12.00, currentStock:15 },
+      { sku:'PIN-001', name:'Pintura blanca 1L',       category:'Pinturas',     unit:'Litro',  minStock:5,   price:18.00, currentStock:20 },
+      { sku:'CAB-001', name:'Cable eléctrico #12',     category:'Eléctricos',   unit:'Metro',  minStock:50,  price:1.50,  currentStock:200 },
+      { sku:'BOM-001', name:'Bombilla LED 9W',         category:'Iluminación',  unit:'Unidad', minStock:10,  price:5.00,  currentStock:30 },
+      { sku:'TUB-001', name:'Tubo PVC 1/2"',           category:'Plomería',     unit:'Metro',  minStock:20,  price:2.00,  currentStock:80 },
+    ];
+    case 'pharmacy': return [
+      { sku:'MED-001', name:'Acetaminofén 500mg',  category:'Analgésicos',      unit:'Caja',   minStock:10, price:4.50,  currentStock:35 },
+      { sku:'MED-002', name:'Ibuprofeno 400mg',    category:'Analgésicos',      unit:'Caja',   minStock:10, price:5.80,  currentStock:28 },
+      { sku:'MED-003', name:'Loratadina 10mg',     category:'Antihistamínicos', unit:'Caja',   minStock:8,  price:6.20,  currentStock:15 },
+      { sku:'MED-004', name:'Amoxicilina 500mg',   category:'Antibióticos',     unit:'Caja',   minStock:5,  price:12.00, currentStock:10 },
+      { sku:'VIT-001', name:'Vitamina C 1000mg',   category:'Vitaminas',        unit:'Frasco', minStock:8,  price:15.00, currentStock:20 },
+      { sku:'HIG-001', name:'Alcohol 70% 250ml',   category:'Higiene personal', unit:'Frasco', minStock:15, price:3.50,  currentStock:40 },
+      { sku:'HIG-002', name:'Jabón antibacterial', category:'Higiene personal', unit:'Unidad', minStock:20, price:2.80,  currentStock:55 },
+      { sku:'INS-001', name:'Termómetro digital',  category:'Instrumentos',     unit:'Unidad', minStock:3,  price:18.00, currentStock:8 },
+    ];
+    case 'petshop': return [
+      { sku:'ALI-001', name:'Alimento perro adulto 15kg', category:'Alimento perros', unit:'Bolsa',  minStock:5,  price:85.00, currentStock:12 },
+      { sku:'ALI-002', name:'Alimento gato adulto 10kg',  category:'Alimento gatos',  unit:'Bolsa',  minStock:5,  price:70.00, currentStock:10 },
+      { sku:'COL-001', name:'Collar mediano',             category:'Accesorios',      unit:'Unidad', minStock:6,  price:12.00, currentStock:18 },
+      { sku:'COR-001', name:'Correa extensible',          category:'Accesorios',      unit:'Unidad', minStock:4,  price:25.00, currentStock:9 },
+      { sku:'ARE-001', name:'Arena sanitaria 5kg',        category:'Higiene',         unit:'Bolsa',  minStock:8,  price:15.00, currentStock:20 },
+      { sku:'SHA-001', name:'Shampoo para perro',         category:'Higiene',         unit:'Frasco', minStock:6,  price:18.00, currentStock:12 },
+      { sku:'JUG-001', name:'Pelota de juguete',          category:'Juguetes',        unit:'Unidad', minStock:10, price:8.00,  currentStock:25 },
+      { sku:'ANT-001', name:'Antipulgas tabletas',        category:'Salud animal',    unit:'Caja',   minStock:5,  price:22.00, currentStock:10 },
+    ];
+    case 'retail': return [
+      { sku:'ARR-001', name:'Arroz 1kg',                category:'Abarrotes', unit:'Kg',     minStock:20, price:2.50, currentStock:60 },
+      { sku:'AZU-001', name:'Azúcar blanca 1kg',        category:'Abarrotes', unit:'Kg',     minStock:10, price:3.00, currentStock:35 },
+      { sku:'ACE-001', name:'Aceite vegetal 1L',        category:'Abarrotes', unit:'Litro',  minStock: 5, price:7.20, currentStock:18 },
+      { sku:'LEC-001', name:'Leche entera',             category:'Lácteos',   unit:'Litro',  minStock:12, price:4.50, currentStock:30 },
+      { sku:'PAN-001', name:'Pan blanco',               category:'Panadería', unit:'Unidad', minStock:30, price:0.80, currentStock:80 },
+      { sku:'GAS-001', name:'Gaseosa 2L',               category:'Bebidas',   unit:'Unidad', minStock:15, price:3.50, currentStock:40 },
+      { sku:'JAB-001', name:'Jabón en polvo 1kg',       category:'Aseo',      unit:'Unidad', minStock:10, price:5.80, currentStock:22 },
+      { sku:'PAP-001', name:'Papel higiénico 4 rollos', category:'Aseo',      unit:'Paquete',minStock:12, price:4.00, currentStock:28 },
+    ];
+    default: return [];
+  }
+}
+
+function defaultCategoriesListFor(vertical) {
+  return ({
+    retail:   ['Abarrotes','Bebidas','Lácteos','Panadería','Aseo','Cuidado personal','Congelados','Snacks'],
+    bakery:   ['Insumos secos','Lácteos','Frescos','Saborizantes','Decoración','Empaques','Productos terminados'],
+    hardware: ['Tornillería','Herramientas','Pinturas','Eléctricos','Iluminación','Plomería','Jardinería','Seguridad'],
+    pharmacy: ['Analgésicos','Antibióticos','Antihistamínicos','Vitaminas','Higiene personal','Instrumentos','Dermatológicos','Cuidado infantil'],
+    petshop:  ['Alimento perros','Alimento gatos','Accesorios','Higiene','Juguetes','Salud animal','Transporte','Acuarios'],
+    other:    [],
+  })[vertical] || [];
+}
+
+function defaultUnitsListFor(vertical) {
+  return ({
+    retail:   ['Unidad','Kg','Litro','Paquete','Caja','Docena'],
+    bakery:   ['Kg','g','Litro','ml','Unidad','Docena','Paquete'],
+    hardware: ['Unidad','Metro','Rollo','Caja','Litro','Juego','Par'],
+    pharmacy: ['Caja','Unidad','Frasco','Blíster','Ampolla','Tubo'],
+    petshop:  ['Bolsa','Unidad','Kg','Lata','Frasco','Caja'],
+    other:    ['Unidad','Kg','Litro','Paquete','Caja'],
+  })[vertical] || ['Unidad'];
+}
+
+function load(key, fallback) {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+}
+function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
+
+// ---------- STATE ----------
+const store = {
+  tenant:    load(LS_TENANT, null),
+  user:      load(LS_USER, null),
+  branches:  load(LS_BRANCHES, []),
+  settings:  load(LS_SETTINGS, null),
+  products:  load(LS_PRODUCTS, []),
+  movements: load(LS_MOVEMENTS, []),
+};
+
+function hasTenant() { return !!store.tenant; }
+
+// ---------- DERIVED ----------
+function stockByProduct() {
+  const s = {};
+  for (const p of store.products) s[p.id] = 0;
+  for (const m of store.movements) {
+    if (s[m.productId] === undefined) s[m.productId] = 0;
+    s[m.productId] += (isIncoming(m.type) ? 1 : -1) * m.quantity;
+  }
+  return s;
+}
+function stockOf(pid) { return stockByProduct()[pid] ?? 0; }
+function totalUnits() {
+  return Object.values(stockByProduct()).reduce((a, v) => a + Math.max(0, v), 0);
+}
+function lowStockProducts() {
+  const s = stockByProduct();
+  return store.products
+    .filter(p => (s[p.id] ?? 0) < p.minStock)
+    .map(p => ({ ...p, current: s[p.id] ?? 0, missing: p.minStock - (s[p.id] ?? 0) }));
+}
+function recentMovements(n = 10) {
+  return [...store.movements].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0, n);
+}
+function productName(id) { return store.products.find(p => p.id === id)?.name ?? '—'; }
+function productSku(id)  { return store.products.find(p => p.id === id)?.sku ?? ''; }
+function categories()   { return [...new Set(store.products.map(p => p.category))].sort(); }
+
+// ---------- MUTATIONS ----------
+function createProduct(data) {
+  const exists = store.products.some(p => p.sku.toLowerCase() === data.sku.trim().toLowerCase());
+  if (exists) throw new Error(`Ya existe un producto con SKU "${data.sku}".`);
+  const p = { ...data, id: uid(), createdAt: new Date().toISOString() };
+  store.products.push(p);
+  save(LS_PRODUCTS, store.products);
+  return p;
+}
+function updateProduct(id, patch) {
+  const dup = store.products.find(p => p.sku.toLowerCase() === (patch.sku||'').trim().toLowerCase() && p.id !== id);
+  if (dup) throw new Error(`Ya existe otro producto con SKU "${patch.sku}".`);
+  const i = store.products.findIndex(p => p.id === id);
+  if (i < 0) throw new Error('Producto no encontrado.');
+  store.products[i] = { ...store.products[i], ...patch };
+  save(LS_PRODUCTS, store.products);
+}
+function deleteProduct(id) {
+  if (store.movements.some(m => m.productId === id)) {
+    throw new Error('No se puede eliminar un producto con movimientos registrados.');
+  }
+  store.products = store.products.filter(p => p.id !== id);
+  save(LS_PRODUCTS, store.products);
+}
+function registerMovement(input) {
+  if (input.quantity <= 0) throw new Error('La cantidad debe ser mayor a 0.');
+  const product = store.products.find(p => p.id === input.productId);
+  if (!product) throw new Error('Producto no encontrado.');
+  const delta = isIncoming(input.type) ? input.quantity : -input.quantity;
+  const projected = stockOf(product.id) + delta;
+  if (projected < 0) {
+    throw new Error(`Stock insuficiente para "${product.name}". Disponible: ${stockOf(product.id)} ${product.unit}, solicitado: ${input.quantity} ${product.unit}.`);
+  }
+  const mv = { ...input, id: uid(), createdAt: new Date().toISOString() };
+  store.movements.push(mv);
+  save(LS_MOVEMENTS, store.movements);
+  return mv;
+}
+function clearAllData() {
+  [LS_TENANT, LS_USER, LS_BRANCHES, LS_SETTINGS, LS_PRODUCTS, LS_MOVEMENTS].forEach(k => localStorage.removeItem(k));
+  store.tenant = null; store.user = null; store.branches = []; store.settings = null;
+  store.products = []; store.movements = [];
+  onboardingState = { step: 0, data: {} };
+}
+
+function restoreDemo() {
+  if (!confirm('↺ Esto reemplazará los datos actuales con la empresa demo de muestra. ¿Continuar?')) return;
+  clearAllData();
+  seedDemoCompany();
+  render();
+  toast('Demo de muestra restaurado.', 'success');
+}
+
+function startClientDemo() {
+  if (!confirm('🆕 Se cerrará la empresa demo y empezarás un registro nuevo con los datos del cliente. Podrás volver al demo cuando quieras. ¿Continuar?')) return;
+  clearAllData();
+  render();
+  toast('Listo. Registra la empresa del cliente.', 'info');
+}
+
+// Pre-seeded sample company so the app is demo-ready at first open.
+function seedDemoCompany() {
+  const nowIso = new Date().toISOString();
+  const tid = uid();
+  store.tenant = {
+    id: tid,
+    name: 'Tienda Demo Inventra',
+    vertical: 'retail',
+    customVerticalName: '',
+    country: 'Colombia',
+    currency: 'COP',
+    createdAt: nowIso,
+  };
+  store.user = { id: uid(), name: 'Administrador Demo', email: 'demo@inventra.ai', role: 'Propietario', tenantId: tid };
+  store.branches = [{ id: uid(), tenantId: tid, name: 'Sucursal Principal', address: 'Calle 10 #5-20, Bogotá' }];
+  store.settings = {
+    tenantId: tid,
+    valuationMethod: 'promedio',
+    allowNegativeStock: false,
+    defaultMinStock: 5,
+    currency: 'COP',
+  };
+  const mk = (sku, name, category, unit, minStock, cost, price, stock) => {
+    const pid = uid();
+    store.products.push({
+      id: pid, tenantId: tid, sku, name, category, unit,
+      minStock, cost, price, active: true, createdAt: nowIso,
+    });
+    if (stock > 0) {
+      const seedIso = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+      store.movements.push({
+        id: uid(), tenantId: tid, productId: pid, type: 'in',
+        quantity: stock, unitCost: cost,
+        reason: 'Saldo inicial', reference: 'INI-' + sku, createdAt: seedIso,
+      });
+    }
+    return pid;
+  };
+  //                   sku        nombre                       categoría    unidad   mín  costo  precio stock
+  const arroz   = mk('PRO-001', 'Arroz Diana 500g',       'Abarrotes', 'Unidad', 10,  2400,  3500, 80);
+  const azucar  = mk('PRO-002', 'Azúcar Incauca 1kg',     'Abarrotes', 'Unidad', 10,  3800,  5200, 55);
+  const aceite  = mk('PRO-003', 'Aceite Girasol 1L',      'Abarrotes', 'Litro',   8,  7200,  9800, 30);
+  const leche   = mk('PRO-004', 'Leche Alpina 1L',        'Lácteos',   'Litro',  12,  3500,  4700, 60);
+  const pan     = mk('PRO-005', 'Pan tajado Bimbo',       'Panadería', 'Unidad', 10,  5400,  6800, 40);
+  const gaseosa = mk('PRO-006', 'Gaseosa Postobón 1.5L',  'Bebidas',   'Unidad', 15,  3100,  4500, 70);
+  const jabon   = mk('PRO-007', 'Jabón Rey 300g',         'Aseo',      'Unidad',  8,  2200,  3200, 40);
+  const atun    = mk('PRO-008', 'Atún Van Camps lata',    'Abarrotes', 'Unidad', 12,  5800,  7500, 60);
+  const galle   = mk('PRO-009', 'Galletas Saltín Noel',   'Abarrotes', 'Unidad', 10,  1800,  2800, 8); // sobrestock NO, justo
+  const choco   = mk('PRO-010', 'Chocolatina Jet',        'Abarrotes', 'Unidad', 20,   800,  1500, 120); // sobrestock
+  const cafe    = mk('PRO-011', 'Café Sello Rojo 250g',   'Abarrotes', 'Unidad',  8, 11000, 15500, 22);
+  const shampoo = mk('PRO-012', 'Shampoo Savital 550ml',  'Aseo',      'Unidad',  6, 14000, 18900, 10);
+  // Producto muerto (sin movimientos de salida)
+  const olla    = mk('PRO-013', 'Olla arrocera 1.5L',     'Hogar',     'Unidad',  2, 45000, 68000, 5);
+
+  // --- Movimientos distribuidos en 30 días para pronóstico realista ---
+  const day = i => new Date(Date.now() - i * 24 * 3600 * 1000).toISOString();
+  let n = 0;
+  // vta() acepta un multiplicador opcional de precio (1 = precio de lista, 0.9 = descuento 10%, etc.)
+  // para demostrar que cada venta puede tener un precio unitario distinto.
+  const vta = (pid, qty, daysAgo, priceMul) => {
+    const prod = store.products.find(p => p.id === pid);
+    const list = Number(prod?.price) || 0;
+    const unitPrice = priceMul ? Math.round(list * priceMul) : list;
+    store.movements.push({
+      id: uid(), tenantId: tid, productId: pid, type: 'out',
+      quantity: qty, unitPrice, reason: 'Venta',
+      reference: 'VTA-' + String(++n).padStart(4,'0'), createdAt: day(daysAgo),
+    });
+  };
+  const comp = (pid, qty, daysAgo, ref, unitCost) => store.movements.push({
+    id: uid(), tenantId: tid, productId: pid, type: 'in',
+    quantity: qty, unitCost,
+    reason: 'Compra proveedor', reference: ref, createdAt: day(daysAgo),
+  });
+  // Variación de precios para simular realidad: descuentos ocasionales, promos, y precios llenos.
+  const mulFull = () => 1;
+  const mulPromo = () => 0.9 + Math.random() * 0.08;   // 90%-98%
+  const mulFlash = () => 0.8 + Math.random() * 0.05;   // 80%-85% (liquidación)
+  // Arroz — rotación muy alta (estrella clase A), precio casi siempre pleno con algún descuento puntual
+  [28,26,24,22,20,18,16,14,12,10,8,6,5,3,1].forEach((d,i) => vta(arroz, 3 + Math.floor(Math.random()*3), d, i===5 ? mulPromo() : mulFull()));
+  // Leche — alta rotación, promoción ocasional
+  [27,25,22,19,16,13,10,7,4,2].forEach((d,i) => vta(leche, 5 + Math.floor(Math.random()*3), d, i===3 ? mulPromo() : mulFull()));
+  // Gaseosa — muy alta rotación, varias promos
+  [29,27,24,21,18,15,12,9,6,3,1].forEach((d,i) => vta(gaseosa, 6 + Math.floor(Math.random()*4), d, (i%3===0) ? mulPromo() : mulFull()));
+  // Pan — precio pleno
+  [26,23,20,17,14,11,8,5,2].forEach(d => vta(pan, 4 + Math.floor(Math.random()*2), d));
+  // Azúcar — rotación media
+  [25,20,15,10,5].forEach(d => vta(azucar, 4 + Math.floor(Math.random()*3), d));
+  // Aceite — rotación media
+  [24,18,12,6,2].forEach(d => vta(aceite, 2 + Math.floor(Math.random()*2), d));
+  // Jabón — rotación media
+  [23,18,13,8,3].forEach(d => vta(jabon, 3, d));
+  // Atún — media
+  [22,15,8,2].forEach(d => vta(atun, 5, d));
+  // Galletas — alta (se agotará muy pronto)
+  [25,22,19,16,13,10,7,4,1].forEach(d => vta(galle, 2, d));
+  // Chocolatina — se liquida a bajo precio (sobrestock)
+  [20,10].forEach(d => vta(choco, 3, d, mulFlash()));
+  // Café — precio pleno
+  [20,10,2].forEach(d => vta(cafe, 2, d));
+  // Shampoo — margen bajo, rotación baja, con promo
+  [15,5].forEach((d,i) => vta(shampoo, 2, d, i===0 ? mulPromo() : mulFull()));
+  // Olla — sin ventas (producto muerto)
+  // Compras recibidas (con costos que cambian para demostrar WAC):
+  comp(arroz,   30, 12, 'FAC-1011', 2500);   // costo subió de 2400 → 2500
+  comp(leche,   40, 8,  'FAC-1012', 3600);   // costo subió de 3500 → 3600
+  comp(gaseosa, 30, 5,  'FAC-1013', 3100);   // costo igual
+  comp(pan,     20, 15, 'FAC-1014', 5400);   // costo igual
+  comp(galle,   10, 20, 'FAC-1015', 1850);   // costo levemente arriba
+  comp(atun,    20, 18, 'FAC-1016', 6000);   // costo subió de 5800 → 6000
+  save(LS_TENANT, store.tenant);
+  save(LS_USER, store.user);
+  save(LS_BRANCHES, store.branches);
+  save(LS_SETTINGS, store.settings);
+  save(LS_PRODUCTS, store.products);
+  save(LS_MOVEMENTS, store.movements);
+}
+
+// ---------- ONBOARDING ----------
+let onboardingState = { step: 0, data: {} };
+
+function finishOnboarding() {
+  const d = onboardingState.data;
+  store.tenant = {
+    id: uid(),
+    name: d.companyName,
+    vertical: d.vertical,
+    customVerticalName: d.customVerticalName || '',
+    taxId: d.taxId,
+    currency: d.currency,
+    timezone: d.timezone,
+    email: d.contactEmail,
+    phone: d.contactPhone,
+    createdAt: new Date().toISOString(),
+  };
+  store.user = {
+    id: uid(),
+    name: d.adminName,
+    email: d.adminEmail,
+    role: 'Administrador',
+  };
+  store.branches = [{
+    id: uid(),
+    name: d.branchName,
+    address: d.branchAddress,
+    warehouse: d.warehouseName,
+  }];
+  store.settings = {
+    valuationMethod: d.valuationMethod,
+    allowNegativeStock: d.allowNegative === 'yes',
+    adjustThreshold: Number(d.adjustThreshold || 500),
+  };
+  // Use catalog built during onboarding (editable, pre-filled or custom)
+  const seeds = Array.isArray(d.initialProducts) ? d.initialProducts : [];
+  const now = new Date().toISOString();
+  store.products = seeds.map(p => ({
+    id: uid(),
+    sku: p.sku, name: p.name, category: p.category, unit: p.unit,
+    minStock: Number(p.minStock) || 0,
+    cost: Number(p.cost) || 0,
+    price: Number(p.price) || 0,
+    createdAt: now,
+  }));
+  // Generate "Saldo inicial" movements for products with currentStock > 0
+  store.movements = [];
+  seeds.forEach((seed, i) => {
+    const qty = Number(seed.currentStock || 0);
+    if (qty > 0) {
+      const productId = store.products[i].id;
+      store.movements.push({
+        id: uid(),
+        productId,
+        type: 'in',
+        quantity: qty,
+        unitCost: Number(seed.cost) || 0,
+        reason: 'Saldo inicial',
+        reference: 'INI-' + seed.sku,
+        createdAt: now,
+      });
+    }
+  });
+
+  save(LS_TENANT, store.tenant);
+  save(LS_USER, store.user);
+  save(LS_BRANCHES, store.branches);
+  save(LS_SETTINGS, store.settings);
+  save(LS_PRODUCTS, store.products);
+  save(LS_MOVEMENTS, store.movements);
+
+  onboardingState = { step: 0, data: {} };
+  location.hash = 'dashboard';
+  currentView = 'dashboard';
+  render();
+  toast(`¡Bienvenido, ${store.tenant.name}! Tu sistema está listo.`, 'success');
+}
+
+// ---------- TOAST ----------
+function toast(msg, kind = 'info') {
+  const el = document.createElement('div');
+  el.className = 'toast ' + kind;
+  el.textContent = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => el.remove(), kind === 'error' ? 5000 : 3500);
+}
+
+// ---------- ROUTING ----------
+const NAV = [
+  { path: 'dashboard', label: 'Dashboard',  icon: '🏠' },
+  { path: 'products',  label: 'Productos',  icon: '📋' },
+  { path: 'stock-in',  label: 'Entradas',   icon: '⬇️' },
+  { path: 'stock-out', label: 'Salidas',    icon: '⬆️' },
+  { path: 'movements', label: 'Movimientos',icon: '📜' },
+  { path: 'reports',   label: 'Reportes',   icon: '📊' },
+  { path: 'insights',  label: 'Inteligencia',icon:'🧠' },
+  { path: 'alerts',    label: 'Alertas',    icon: '🔔' },
+];
+let currentView = (location.hash.slice(1) || 'dashboard');
+window.addEventListener('hashchange', () => { currentView = location.hash.slice(1) || 'dashboard'; render(); });
+
+function navigate(path) { location.hash = path; }
+
+// ---------- RENDER ----------
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderSidebar() {
+  const alerts = lowStockProducts().length;
+  document.getElementById('nav').innerHTML = NAV.map(n => `
+    <div class="nav-item ${n.path === currentView ? 'active' : ''}" onclick="navigate('${n.path}')">
+      <span class="nav-icon">${n.icon}</span>
+      <span class="nav-label">${n.label}</span>
+      ${n.path === 'alerts' && alerts > 0 ? `<span class="nav-badge">${alerts}</span>` : ''}
+    </div>
+  `).join('');
+}
+
+function formatDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('es', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+// ----- Dashboard view
+function viewDashboard() {
+  const low = lowStockProducts();
+  const recent = recentMovements();
+  const { score } = healthScore();
+  const sl = scoreLabel(score);
+  const insights = computeInsights().filter(i => i.level !== 'success').slice(0, 3);
+  const currency = store.tenant?.currency || 'COP';
+  const stock = stockByProduct();
+  const invValue = store.products.reduce((a,p) => a + (stock[p.id] ?? 0) * priceOf(p), 0);
+  const circ = 2 * Math.PI * 42;
+  const offset = circ - (score / 100) * circ;
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Dashboard</h1>
+          <div class="page-subtitle">Panorama de inventario en tiempo real</div>
+        </div>
+        <div class="row">
+          <button class="btn" onclick="navigate('stock-in')">⬇️ Nueva entrada</button>
+          <button class="btn btn-primary" onclick="navigate('stock-out')">⬆️ Nueva salida</button>
+        </div>
+      </div>
+
+      <div class="grid grid-4">
+        <div class="stat-card" style="display:flex;gap:14px;align-items:center;cursor:pointer" onclick="navigate('insights')">
+          <div style="position:relative;width:100px;height:100px;flex-shrink:0">
+            <svg viewBox="0 0 100 100" style="width:100%;height:100%;transform:rotate(-90deg)">
+              <circle cx="50" cy="50" r="42" stroke="var(--surface-3)" stroke-width="10" fill="none"/>
+              <circle cx="50" cy="50" r="42" stroke="${sl.color}" stroke-width="10" fill="none"
+                stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:${sl.color}">${score}</div>
+          </div>
+          <div>
+            <div class="stat-label">Salud del inventario</div>
+            <div style="font-weight:600;color:${sl.color};margin-top:4px">${sl.label}</div>
+            <div class="stat-hint" style="margin-top:4px">Ver análisis →</div>
+          </div>
+        </div>
+        <div class="stat-card ok">
+          <div class="stat-label">Unidades en stock</div>
+          <div class="stat-value">${totalUnits()}</div>
+          <div class="stat-hint">${store.products.length} producto(s) activo(s)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Valor del inventario</div>
+          <div class="stat-value" style="font-size:22px">${formatMoney(invValue, currency)}</div>
+          <div class="stat-hint">A precio de venta</div>
+        </div>
+        <div class="stat-card ${low.length > 0 ? 'alert' : 'ok'}">
+          <div class="stat-label">Productos en alerta</div>
+          <div class="stat-value">${low.length}</div>
+          <div class="stat-hint">${low.length > 0 ? 'Requieren reposición' : 'Todo bajo control'}</div>
+        </div>
+      </div>
+
+      ${insights.length > 0 ? `
+        <section class="card mt-16">
+          <div class="row-between" style="margin-bottom:8px">
+            <h2 style="margin:0">🧠 Recomendaciones automáticas</h2>
+            <button class="btn btn-sm" onclick="navigate('insights')">Ver todas →</button>
+          </div>
+          ${insights.map(i => `
+            <div class="insight ${i.level}">
+              <div class="insight-icon">${i.icon}</div>
+              <div>
+                <div class="insight-title">${esc(i.title)}</div>
+                <div class="insight-msg">${esc(i.message)}</div>
+                ${i.products.length ? `<div class="insight-products">
+                  ${i.products.slice(0,5).map(p => `<span class="insight-chip">${esc(p.name)}</span>`).join('')}
+                  ${i.products.length > 5 ? `<span class="insight-chip">+${i.products.length - 5}</span>` : ''}
+                </div>` : ''}
+              </div>
+            </div>`).join('')}
+        </section>
+      ` : ''}
+
+      <div class="grid grid-2 mt-16">
+        <section class="card">
+          <div class="row-between mt-0" style="margin-bottom:12px">
+            <h2>Productos con stock bajo</h2>
+            <button class="btn btn-sm" onclick="navigate('alerts')">Ver todas</button>
+          </div>
+          ${low.length === 0
+            ? `<div class="empty"><div class="empty-icon">✅</div><strong>Sin alertas</strong><div>Ningún producto está bajo el mínimo.</div></div>`
+            : `<table class="table"><thead><tr>
+                <th>Producto</th><th class="num">Stock</th><th class="num">Mínimo</th><th>Estado</th>
+              </tr></thead><tbody>
+              ${low.map(p => `
+                <tr>
+                  <td><div style="font-weight:500">${esc(p.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(p.sku)}</div></td>
+                  <td class="num">${p.current} ${esc(p.unit)}</td>
+                  <td class="num">${p.minStock} ${esc(p.unit)}</td>
+                  <td><span class="badge badge-danger">Reponer ${p.missing}</span></td>
+                </tr>`).join('')}
+              </tbody></table>`}
+        </section>
+
+        <section class="card">
+          <div class="row-between" style="margin-bottom:12px">
+            <h2>Últimos movimientos</h2>
+            <button class="btn btn-sm" onclick="navigate('movements')">Ver historial</button>
+          </div>
+          ${recent.length === 0
+            ? `<div class="empty"><div class="empty-icon">📭</div><strong>Sin movimientos</strong><div>Aún no se han registrado entradas ni salidas.</div></div>`
+            : `<table class="table"><thead><tr>
+                <th>Fecha</th><th>Producto</th><th>Tipo</th><th class="num">Cantidad</th>
+              </tr></thead><tbody>
+              ${recent.map(m => {
+                const inc = isIncoming(m.type);
+                return `<tr>
+                  <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
+                  <td>${esc(productName(m.productId))}</td>
+                  <td><span class="badge ${inc ? 'badge-ok' : 'badge-warn'}">${MOVEMENT_LABELS[m.type]}</span></td>
+                  <td class="num">${inc ? '+' : '−'}${m.quantity}</td>
+                </tr>`;
+              }).join('')}
+              </tbody></table>`}
+        </section>
+      </div>
+    </div>`;
+}
+
+// ----- Products view
+let productFilters = { q: '', category: '', stock: 'all' };
+
+function viewProducts() {
+  const stock = stockByProduct();
+  const q = productFilters.q.trim().toLowerCase();
+  const rows = store.products
+    .map(p => ({ ...p, current: stock[p.id] ?? 0 }))
+    .filter(p => {
+      if (q && !(p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q) || p.category.toLowerCase().includes(q))) return false;
+      if (productFilters.category && p.category !== productFilters.category) return false;
+      if (productFilters.stock === 'low' && p.current >= p.minStock) return false;
+      if (productFilters.stock === 'ok' && p.current < p.minStock) return false;
+      if (productFilters.stock === 'zero' && p.current !== 0) return false;
+      return true;
+    });
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Productos</h1>
+          <div class="page-subtitle">${store.products.length} producto(s) · ${totalUnits()} unidad(es) en stock</div>
+        </div>
+        <button class="btn btn-primary" onclick="openProductForm()">+ Nuevo producto</button>
+      </div>
+
+      <div class="card">
+        <div class="row" style="margin-bottom:12px">
+          <div class="field" style="flex:1;min-width:200px">
+            <input type="search" placeholder="Buscar por nombre, SKU o categoría…"
+                   value="${esc(productFilters.q)}"
+                   oninput="productFilters.q=this.value;render()">
+          </div>
+          <div class="field">
+            <select onchange="productFilters.category=this.value;render()">
+              <option value="">Todas las categorías</option>
+              ${categories().map(c => `<option value="${esc(c)}" ${productFilters.category === c ? 'selected':''}>${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <select onchange="productFilters.stock=this.value;render()">
+              <option value="all" ${productFilters.stock==='all'?'selected':''}>Todo el stock</option>
+              <option value="low" ${productFilters.stock==='low'?'selected':''}>Bajo mínimo</option>
+              <option value="ok"  ${productFilters.stock==='ok' ?'selected':''}>Sobre mínimo</option>
+              <option value="zero"${productFilters.stock==='zero'?'selected':''}>Sin stock</option>
+            </select>
+          </div>
+        </div>
+
+        ${rows.length === 0
+          ? `<div class="empty"><div class="empty-icon">🔍</div><strong>Sin resultados</strong><div>Ajusta los filtros o crea un nuevo producto.</div></div>`
+          : `<table class="table">
+              <thead><tr>
+                <th>SKU</th><th>Nombre</th><th>Categoría</th><th>Unidad</th>
+                <th class="num">Stock</th><th class="num">Mín.</th>
+                <th class="num" title="Costo promedio ponderado (WAC) calculado sobre todas las compras registradas">Costo prom.</th>
+                <th class="num">Precio</th><th class="num">Margen</th>
+                <th>Estado</th><th></th>
+              </tr></thead>
+              <tbody>
+              ${rows.map(p => {
+                const status = p.current === 0
+                  ? '<span class="badge badge-danger">Sin stock</span>'
+                  : p.current < p.minStock
+                    ? '<span class="badge badge-warn">Bajo mínimo</span>'
+                    : '<span class="badge badge-ok">OK</span>';
+                const color = p.current === 0 ? 'var(--danger)' : (p.current < p.minStock ? 'var(--warning)' : 'var(--text)');
+                const currency = store.tenant?.currency || 'COP';
+                return `<tr>
+                  <td><code>${esc(p.sku)}</code></td>
+                  <td style="font-weight:500">${esc(p.name)}</td>
+                  <td>${esc(p.category)}</td>
+                  <td>${esc(p.unit)}</td>
+                  <td class="num" style="color:${color};font-weight:${p.current<p.minStock?600:400}">${p.current}</td>
+                  <td class="num">${p.minStock}</td>
+                  <td class="num">${hasCost(p) ? formatMoney(costOf(p), currency) : '<span class="text-muted">—</span>'}</td>
+                  <td class="num">${formatMoney(priceOf(p), currency)}</td>
+                  <td class="num">${marginBadge(p)}</td>
+                  <td>${status}</td>
+                  <td>
+                    <div class="row" style="gap:4px">
+                      <button class="btn btn-sm" onclick="openProductForm('${p.id}')">Editar</button>
+                      <button class="btn btn-sm" onclick="handleDeleteProduct('${p.id}','${esc(p.name)}')">Eliminar</button>
+                    </div>
+                  </td>
+                </tr>`;
+              }).join('')}
+              </tbody>
+             </table>`}
+      </div>
+    </div>`;
+}
+
+function handleDeleteProduct(id, name) {
+  if (!confirm(`¿Eliminar el producto "${name}"?`)) return;
+  try { deleteProduct(id); toast(`"${name}" eliminado.`, 'success'); render(); }
+  catch (e) { toast(e.message, 'error'); }
+}
+
+// ----- Product form (modal)
+function openProductForm(id) {
+  const editing = id ? store.products.find(p => p.id === id) : null;
+  const title = editing ? 'Editar producto' : 'Nuevo producto';
+  const current = editing ? stockOf(editing.id) : 0;
+
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>${title}</h2>
+          <button class="close-x" onclick="closeModal()">✕</button>
+        </div>
+        <form id="product-form" onsubmit="submitProduct(event, ${editing?`'${editing.id}'`:'null'})">
+          <div class="modal-body">
+            <div class="form-grid">
+              <div class="field">
+                <label class="required">SKU</label>
+                <input name="sku" required value="${esc(editing?.sku || '')}" placeholder="Ej: AZU-001"/>
+              </div>
+              <div class="field">
+                <label class="required">Nombre</label>
+                <input name="name" required value="${esc(editing?.name || '')}" placeholder="Ej: Azúcar"/>
+              </div>
+              <div class="field">
+                <label class="required">Categoría</label>
+                <input name="category" required list="cat-list" value="${esc(editing?.category || '')}" placeholder="Ej: Abarrotes"/>
+                <datalist id="cat-list">${categories().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+              </div>
+              <div class="field">
+                <label class="required">Unidad</label>
+                <input name="unit" required list="unit-list" value="${esc(editing?.unit || '')}" placeholder="Ej: Kg, Unidad, Litro"/>
+                <datalist id="unit-list">${[...new Set(store.products.map(p => p.unit))].map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+              </div>
+              <div class="field">
+                <label class="required">Stock mínimo</label>
+                <input type="number" min="0" step="1" name="minStock" required value="${editing?.minStock ?? 0}"/>
+                <div class="hint">Dispara alerta si el stock cae bajo este valor.</div>
+              </div>
+              <div class="field">
+                <label>Costo unitario de referencia (${esc(store.tenant?.currency || 'COP')})</label>
+                <input type="number" min="0" step="0.01" name="cost" value="${editing?.cost ?? 0}"/>
+                <div class="hint">Costo inicial o esperado. El sistema lo actualiza automáticamente con cada entrada según el método de valoración (${valuationMethodLabel()}).</div>
+              </div>
+              <div class="field">
+                <label>Precio de venta unitario (${esc(store.tenant?.currency || 'COP')})</label>
+                <input type="number" min="0" step="0.01" name="price" value="${editing?.price ?? 0}"/>
+                <div class="hint">Precio al que vendes 1 unidad al cliente.</div>
+              </div>
+              ${editing
+                ? `<div class="field">
+                    <label>Stock actual</label>
+                    <input disabled value="${current} ${esc(editing.unit)}"/>
+                    <div class="hint">Se modifica solo con movimientos (por trazabilidad).</div>
+                   </div>
+                   <div class="field" style="grid-column:1/-1;background:var(--primary-soft);padding:12px;border-radius:8px;margin-top:4px">
+                    <label>⬇️ Agregar stock rápido</label>
+                    <div class="row" style="gap:8px">
+                      <input type="number" min="1" step="1" id="quick-stock-qty" placeholder="Cantidad a ingresar" style="flex:1"/>
+                      <select id="quick-stock-reason" style="flex:1">
+                        <option>Ajuste inicial</option>
+                        <option>Compra</option>
+                        <option>Devolución de cliente</option>
+                        <option>Producción</option>
+                      </select>
+                      <button type="button" class="btn btn-primary" onclick="quickAddStock('${editing.id}')">+ Registrar entrada</button>
+                    </div>
+                    <div class="hint">Queda registrado en el historial con motivo trazable.</div>
+                   </div>`
+                : `<div class="field"><label>Stock inicial</label><input type="number" min="0" step="1" name="initialStock" value="0"/><div class="hint">Genera una entrada inicial automática.</div></div>`}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary">${editing ? 'Guardar cambios' : 'Crear producto'}</button>
+          </div>
+        </form>
+      </div>
+    </div>`;
+  document.getElementById('modal-root').innerHTML = html;
+}
+
+function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
+
+function quickAddStock(productId) {
+  const qtyEl = document.getElementById('quick-stock-qty');
+  const reasonEl = document.getElementById('quick-stock-reason');
+  const qty = Number(qtyEl?.value);
+  const reason = reasonEl?.value || 'Ajuste inicial';
+  if (!qty || qty <= 0) { toast('Ingresa una cantidad mayor a 0.', 'error'); return; }
+  try {
+    registerMovement({
+      productId, type: 'in', quantity: qty,
+      reason, reference: 'QUICK-' + Date.now().toString(36).slice(-4)
+    });
+    const p = store.products.find(x => x.id === productId);
+    toast(`+${qty} ${p.unit} de "${p.name}" agregado. Stock: ${stockOf(productId)}`, 'success');
+    // Keep modal open and refresh just the "Stock actual" input
+    const stockInput = document.querySelector('.modal input[disabled]');
+    if (stockInput) stockInput.value = `${stockOf(productId)} ${p.unit}`;
+    if (qtyEl) qtyEl.value = '';
+    render(); // refresh the product list underneath so when modal closes, data is fresh
+    // Re-open modal because render() cleared it
+    openProductForm(productId);
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+function submitProduct(e, id) {
+  e.preventDefault();
+  const f = e.target;
+  const data = {
+    sku: f.sku.value.trim(),
+    name: f.name.value.trim(),
+    category: f.category.value.trim(),
+    unit: f.unit.value.trim(),
+    minStock: Number(f.minStock.value),
+    cost: Number(f.cost?.value || 0),
+    price: Number(f.price.value),
+  };
+  try {
+    if (id) {
+      updateProduct(id, data);
+      toast(`"${data.name}" actualizado.`, 'success');
+    } else {
+      const p = createProduct(data);
+      const initial = Number(f.initialStock?.value ?? 0);
+      if (initial > 0) {
+        registerMovement({ productId: p.id, type: 'in', quantity: initial, unitCost: Number(data.cost) || 0, reason: 'Stock inicial', reference: 'INI-' + p.sku });
+      }
+      toast(`"${data.name}" creado.`, 'success');
+    }
+    closeModal();
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ----- Stock In view
+function viewStockIn() {
+  const recent = store.movements.filter(m => m.type === 'in')
+    .sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8);
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Entradas de inventario</h1>
+          <div class="page-subtitle">Registra ingresos por compra, producción o devolución.</div>
+        </div>
+        <button class="btn" onclick="navigate('movements')">Ver historial completo</button>
+      </div>
+
+      <div class="grid grid-2">
+        <section class="card">
+          <h2>Nueva entrada</h2>
+          <form onsubmit="submitStockIn(event)">
+            <div class="form-grid">
+              <div class="field">
+                <label class="required">Producto</label>
+                <select name="productId" required oninput="updateStockInHint(this)">
+                  <option value="">Seleccionar…</option>
+                  ${store.products.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)})</option>`).join('')}
+                </select>
+                <div class="hint" id="stockin-hint"></div>
+              </div>
+              <div class="field">
+                <label class="required">Cantidad</label>
+                <input name="quantity" type="number" min="1" step="1" required value="1"/>
+              </div>
+              <div class="field">
+                <label>Costo unitario de esta compra</label>
+                <input name="unitCost" id="stockin-unitcost" type="number" min="0" step="0.01" value="0"/>
+                <div class="hint">Si el proveedor cambió el precio, ingresa el nuevo costo. Se usará para recalcular el costo promedio del producto.</div>
+              </div>
+              <div class="field">
+                <label class="required">Motivo</label>
+                <select name="reason" required>
+                  <option value="">Seleccionar…</option>
+                  <option>Compra</option>
+                  <option>Devolución de cliente</option>
+                  <option>Producción</option>
+                  <option>Ajuste por conteo</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Referencia</label>
+                <input name="reference" placeholder="Ej: COMP-001"/>
+              </div>
+            </div>
+            <div class="row" style="margin-top:16px;justify-content:flex-end">
+              <button type="submit" class="btn btn-primary">⬇️ Registrar entrada</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Últimas entradas</h2>
+          ${recent.length === 0
+            ? `<div class="empty"><div class="empty-icon">⬇️</div><strong>Sin entradas aún</strong><div>Registra la primera del día.</div></div>`
+            : `<table class="table"><thead><tr>
+                <th>Fecha</th><th>Producto</th><th class="num">Cantidad</th><th>Motivo</th>
+              </tr></thead><tbody>
+              ${recent.map(m => `<tr>
+                <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
+                <td>${esc(productName(m.productId))}</td>
+                <td class="num" style="color:var(--success);font-weight:600">+${m.quantity}</td>
+                <td>${esc(m.reason)}</td>
+              </tr>`).join('')}
+              </tbody></table>`}
+        </section>
+      </div>
+    </div>`;
+}
+
+function updateStockInHint(sel) {
+  const p = store.products.find(x => x.id === sel.value);
+  const hint = document.getElementById('stockin-hint');
+  const costInput = document.getElementById('stockin-unitcost');
+  if (!hint) return;
+  if (p) {
+    const currency = store.tenant?.currency || 'COP';
+    const current = costOf(p);
+    hint.innerHTML = `Stock: <strong>${stockOf(p.id)} ${esc(p.unit)}</strong> · Costo actual (${valuationMethodLabel()}): <strong>${formatMoney(current, currency)}</strong>`;
+    if (costInput && Number(costInput.value) === 0 && current > 0) costInput.value = current.toFixed(2);
+  } else {
+    hint.innerHTML = '';
+  }
+}
+
+function submitStockIn(e) {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    registerMovement({
+      productId: f.productId.value,
+      type: 'in',
+      quantity: Number(f.quantity.value),
+      reason: f.reason.value,
+      unitCost: Number(f.unitCost.value) || undefined,
+      reference: f.reference.value || undefined,
+    });
+    toast(`Entrada de ${f.quantity.value} unidad(es) registrada.`, 'success');
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ----- Stock Out view
+function viewStockOut() {
+  const recent = store.movements.filter(m => m.type === 'out' || m.type === 'adjust_neg')
+    .sort((a,b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 8);
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Salidas de inventario</h1>
+          <div class="page-subtitle">Registra ventas, consumos, mermas o ajustes negativos.</div>
+        </div>
+        <button class="btn" onclick="navigate('movements')">Ver historial completo</button>
+      </div>
+
+      <div class="grid grid-2">
+        <section class="card">
+          <h2>Nueva salida</h2>
+          <form onsubmit="submitStockOut(event)" oninput="validateOut(this)">
+            <div class="form-grid">
+              <div class="field">
+                <label class="required">Producto</label>
+                <select name="productId" required>
+                  <option value="">Seleccionar…</option>
+                  ${store.products.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) · stock ${stockOf(p.id)}</option>`).join('')}
+                </select>
+                <div class="hint" id="stockout-hint"></div>
+              </div>
+              <div class="field" id="qty-field">
+                <label class="required">Cantidad</label>
+                <input name="quantity" type="number" min="1" step="1" required value="1"/>
+                <div class="error" id="stockout-error" style="display:none"></div>
+              </div>
+              <div class="field">
+                <label class="required">Motivo</label>
+                <select name="reason" required onchange="toggleStockOutPrice(this.form)">
+                  <option value="">Seleccionar…</option>
+                  <option>Venta</option>
+                  <option>Consumo interno</option>
+                  <option>Merma / daño</option>
+                  <option>Devolución a proveedor</option>
+                  <option value="Ajuste por conteo">Ajuste por conteo (−)</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <div class="field" id="stockout-price-field" style="display:none">
+                <label>Precio de venta unitario</label>
+                <input name="unitPrice" id="stockout-unitprice" type="number" min="0" step="0.01" value="0"/>
+                <div class="hint">Si vendiste a un precio distinto al de lista (descuento, promoción, ajuste), ingrésalo aquí. Si lo dejas en 0 se usa el precio del producto.</div>
+              </div>
+              <div class="field">
+                <label>Referencia</label>
+                <input name="reference" placeholder="Ej: VTA-001"/>
+              </div>
+            </div>
+            <div class="row" style="margin-top:16px;justify-content:flex-end">
+              <button type="submit" id="stockout-submit" class="btn btn-primary">⬆️ Registrar salida</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Últimas salidas</h2>
+          ${recent.length === 0
+            ? `<div class="empty"><div class="empty-icon">⬆️</div><strong>Sin salidas aún</strong><div>Registra tu primera salida.</div></div>`
+            : `<table class="table"><thead><tr>
+                <th>Fecha</th><th>Producto</th><th class="num">Cantidad</th><th>Motivo</th>
+              </tr></thead><tbody>
+              ${recent.map(m => `<tr>
+                <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
+                <td>${esc(productName(m.productId))}</td>
+                <td class="num" style="color:var(--danger);font-weight:600">−${m.quantity}</td>
+                <td>${esc(m.reason)}</td>
+              </tr>`).join('')}
+              </tbody></table>`}
+        </section>
+      </div>
+    </div>`;
+}
+
+function toggleStockOutPrice(form) {
+  const field = document.getElementById('stockout-price-field');
+  const input = document.getElementById('stockout-unitprice');
+  if (!field) return;
+  const isSale = form.reason.value === 'Venta';
+  field.style.display = isSale ? '' : 'none';
+  if (!isSale && input) input.value = 0;
+  if (isSale) suggestStockOutPrice(form);
+}
+
+function suggestStockOutPrice(form) {
+  const input = document.getElementById('stockout-unitprice');
+  if (!input) return;
+  const p = store.products.find(x => x.id === form.productId.value);
+  const listPrice = p ? priceOf(p) : 0;
+  if (Number(input.value) === 0 && listPrice > 0) input.value = listPrice.toFixed(2);
+}
+
+function validateOut(form) {
+  const pid = form.productId.value;
+  const qty = Number(form.quantity.value ?? 0);
+  const hint = document.getElementById('stockout-hint');
+  const err = document.getElementById('stockout-error');
+  const qtyField = document.getElementById('qty-field');
+  const btn = document.getElementById('stockout-submit');
+  const p = store.products.find(x => x.id === pid);
+  const currency = store.tenant?.currency || 'COP';
+
+  if (hint) hint.innerHTML = p
+    ? `Disponible: <strong>${stockOf(p.id)} ${esc(p.unit)}</strong> · Mínimo: ${p.minStock} · Precio de lista: <strong>${formatMoney(priceOf(p), currency)}</strong>`
+    : '';
+
+  if (form.reason?.value === 'Venta') suggestStockOutPrice(form);
+
+  if (!p || qty <= 0) {
+    if (err) err.style.display = 'none';
+    if (qtyField) qtyField.classList.remove('invalid');
+    if (btn) btn.disabled = false;
+    return;
+  }
+  const available = stockOf(p.id);
+  if (qty > available) {
+    if (err) { err.textContent = `Stock insuficiente. Disponible: ${available}.`; err.style.display = 'block'; }
+    if (qtyField) qtyField.classList.add('invalid');
+    if (btn) btn.disabled = true;
+  } else {
+    if (err) err.style.display = 'none';
+    if (qtyField) qtyField.classList.remove('invalid');
+    if (btn) btn.disabled = false;
+  }
+}
+
+function submitStockOut(e) {
+  e.preventDefault();
+  const f = e.target;
+  const type = f.reason.value === 'Ajuste por conteo' ? 'adjust_neg' : 'out';
+  const isSale = f.reason.value === 'Venta';
+  const unitPrice = isSale ? Number(f.unitPrice?.value) || undefined : undefined;
+  try {
+    registerMovement({
+      productId: f.productId.value,
+      type,
+      quantity: Number(f.quantity.value),
+      reason: f.reason.value,
+      unitPrice,
+      reference: f.reference.value || undefined,
+    });
+    toast(`Salida de ${f.quantity.value} unidad(es) registrada.`, 'success');
+    render();
+  } catch (err) { toast(err.message, 'error'); }
+}
+
+// ----- Movements view
+let movementFilters = { productId: '', type: '' };
+
+function viewMovements() {
+  const all = [...store.movements].sort((a,b) => a.createdAt.localeCompare(b.createdAt));
+  const balances = {};
+  const enriched = all.map(m => {
+    balances[m.productId] = (balances[m.productId] ?? 0) + (isIncoming(m.type) ? 1 : -1) * m.quantity;
+    return { ...m, runningBalance: balances[m.productId], incoming: isIncoming(m.type), typeLabel: MOVEMENT_LABELS[m.type] };
+  });
+  const filtered = enriched
+    .filter(m => movementFilters.productId ? m.productId === movementFilters.productId : true)
+    .filter(m => movementFilters.type ? m.type === movementFilters.type : true)
+    .reverse();
+
+  let inQty = 0, outQty = 0;
+  filtered.forEach(m => m.incoming ? inQty += m.quantity : outQty += m.quantity);
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Historial de movimientos</h1>
+          <div class="page-subtitle">${filtered.length} movimiento(s) · inmutables y trazables</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="row" style="margin-bottom:12px">
+          <div class="field">
+            <select onchange="movementFilters.productId=this.value;render()">
+              <option value="">Todos los productos</option>
+              ${store.products.map(p => `<option value="${p.id}" ${movementFilters.productId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <select onchange="movementFilters.type=this.value;render()">
+              <option value="">Todos los tipos</option>
+              <option value="in"         ${movementFilters.type==='in'?'selected':''}>Entradas</option>
+              <option value="out"        ${movementFilters.type==='out'?'selected':''}>Salidas</option>
+              <option value="adjust_neg" ${movementFilters.type==='adjust_neg'?'selected':''}>Ajustes (−)</option>
+              <option value="adjust_pos" ${movementFilters.type==='adjust_pos'?'selected':''}>Ajustes (+)</option>
+            </select>
+          </div>
+          <div class="spacer"></div>
+          <div class="row" style="gap:8px">
+            <span class="badge badge-ok">Entradas: ${inQty}</span>
+            <span class="badge badge-warn">Salidas: ${outQty}</span>
+            <span class="badge badge-info">Neto: ${(inQty-outQty) >= 0 ? '+' : ''}${inQty-outQty}</span>
+          </div>
+        </div>
+
+        ${filtered.length === 0
+          ? `<div class="empty"><div class="empty-icon">📜</div><strong>Sin movimientos</strong><div>Aún no hay historial con estos filtros.</div></div>`
+          : `<table class="table">
+              <thead><tr>
+                <th>#</th><th>Fecha</th><th>Producto</th><th>Tipo</th>
+                <th class="num">Cantidad</th><th class="num">Saldo</th><th>Motivo</th><th>Referencia</th>
+              </tr></thead>
+              <tbody>
+              ${filtered.map((m, i) => `
+                <tr>
+                  <td class="text-muted">${filtered.length - i}</td>
+                  <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
+                  <td>
+                    <div style="font-weight:500">${esc(productName(m.productId))}</div>
+                    <div style="font-size:11px;color:var(--muted)">${esc(productSku(m.productId))}</div>
+                  </td>
+                  <td><span class="badge ${m.incoming?'badge-ok':'badge-warn'}">${m.typeLabel}</span></td>
+                  <td class="num" style="color:${m.incoming?'var(--success)':'var(--danger)'};font-weight:600">${m.incoming?'+':'−'}${m.quantity}</td>
+                  <td class="num">${m.runningBalance}</td>
+                  <td>${esc(m.reason)}</td>
+                  <td class="text-muted">${esc(m.reference || '—')}</td>
+                </tr>`).join('')}
+              </tbody>
+             </table>`}
+      </div>
+    </div>`;
+}
+
+// ----- Alerts view
+function viewAlerts() {
+  const alerts = lowStockProducts();
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Alertas de stock</h1>
+          <div class="page-subtitle">Productos cuyo stock cayó bajo el mínimo configurado.</div>
+        </div>
+        <div class="row">
+          <span class="badge ${alerts.length === 0 ? 'badge-ok' : 'badge-danger'}">${alerts.length} alerta(s)</span>
+          <button class="btn btn-primary" onclick="navigate('stock-in')">⬇️ Registrar entrada</button>
+        </div>
+      </div>
+
+      ${alerts.length === 0
+        ? `<section class="card"><div class="empty"><div class="empty-icon">✅</div><strong>Todo en orden</strong><div>Ningún producto está bajo el mínimo configurado.</div></div></section>`
+        : `<section class="card"><table class="table"><thead><tr>
+            <th>Producto</th><th>Categoría</th>
+            <th class="num">Stock actual</th><th class="num">Mínimo</th><th class="num">Faltante</th>
+            <th>Días de cobertura</th><th class="num">Sugerido</th><th>Acción</th>
+          </tr></thead><tbody>
+          ${alerts.map(a => {
+            const pct = a.minStock === 0 ? 100 : Math.min(100, Math.round((a.current/a.minStock)*100));
+            const color = a.current === 0 ? 'var(--danger)' : 'var(--warning)';
+            const cov = daysOfCoverage(a.id, 30);
+            const cl = coverageLabel(cov);
+            const reorder = suggestReorder(a);
+            return `<tr>
+              <td><div style="font-weight:500">${esc(a.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(a.sku)}</div></td>
+              <td>${esc(a.category)}</td>
+              <td class="num" style="color:${color};font-weight:600">${a.current} ${esc(a.unit)}</td>
+              <td class="num">${a.minStock} ${esc(a.unit)}</td>
+              <td class="num" style="color:var(--danger);font-weight:600">${a.missing}</td>
+              <td>
+                <div class="coverage-inline"><span class="coverage-dot" style="background:${cl.color}"></span><span style="color:${cl.color};font-weight:600">${cl.text}</span></div>
+                <div class="coverage-bar" style="margin-top:4px"><div class="coverage-fill" style="width:${pct}%;background:${color}"></div></div>
+              </td>
+              <td class="num">${reorder ? `<strong>${reorder.qty}</strong> ${esc(a.unit)}` : '—'}</td>
+              <td><button class="btn btn-sm btn-primary" onclick="navigate('stock-in')">Reponer</button></td>
+            </tr>`;
+          }).join('')}
+          </tbody></table></section>`}
+    </div>`;
+}
+
+// ===================================================================
+//  AI / ANALYTICS — pronóstico, cobertura, ABC, insights, health score
+// ===================================================================
+const DAY_MS = 24 * 3600 * 1000;
+
+function priceOf(p) { return Number(p?.price ?? 0); }
+
+// ----- Valoración de inventario -----
+function valuationMethod() { return store.settings?.valuationMethod || 'promedio'; }
+function valuationMethodLabel() {
+  const m = valuationMethod();
+  if (m === 'last') return 'Último costo';
+  if (m === 'fifo') return 'FIFO';
+  return 'Promedio ponderado (WAC)';
+}
+function incomingMovementsOf(productId) {
+  return store.movements.filter(m => m.productId === productId && isIncoming(m.type));
+}
+function avgWAC(productId) {
+  const movs = incomingMovementsOf(productId).filter(m => Number(m.unitCost) > 0);
+  if (movs.length === 0) return 0;
+  const totalQty = movs.reduce((a,m) => a + m.quantity, 0);
+  const totalVal = movs.reduce((a,m) => a + m.quantity * Number(m.unitCost), 0);
+  return totalQty > 0 ? totalVal / totalQty : 0;
+}
+function lastInCost(productId) {
+  const movs = incomingMovementsOf(productId).filter(m => Number(m.unitCost) > 0)
+    .sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+  return movs.length > 0 ? Number(movs[0].unitCost) : 0;
+}
+/**
+ * costOf — costo unitario EFECTIVO del producto según el método de valoración.
+ * - 'promedio' (default): promedio ponderado (WAC) de todas las entradas con costo
+ * - 'last': costo de la última entrada con unitCost
+ * - 'fifo': se trata como WAC por simplicidad en este prototipo
+ * Si no hay movimientos con unitCost, usa el costo de referencia del producto.
+ */
+function costOf(p) {
+  if (!p) return 0;
+  const m = valuationMethod();
+  const computed = m === 'last' ? lastInCost(p.id) : avgWAC(p.id);
+  return computed > 0 ? computed : Number(p?.cost || 0);
+}
+function hasCost(p) { return costOf(p) > 0; }
+function marginPct(p) {
+  const pr = priceOf(p); const ct = costOf(p);
+  if (pr <= 0 || ct <= 0) return 0;
+  return ((pr - ct) / pr) * 100;
+}
+function marginBadge(p) {
+  if (!hasCost(p)) return '<span class="badge badge-muted" title="Ingresa el costo unitario para calcular margen">Falta costo</span>';
+  const mp = marginPct(p);
+  const cls = mp >= 30 ? 'badge-ok' : mp >= 15 ? 'badge-info' : mp > 0 ? 'badge-warn' : 'badge-muted';
+  return `<span class="badge ${cls}">${mp.toFixed(1)}%</span>`;
+}
+function movementsSince(productId, days) {
+  const since = Date.now() - days * DAY_MS;
+  return store.movements.filter(m => m.productId === productId && new Date(m.createdAt).getTime() >= since);
+}
+function outQtySince(productId, days) {
+  return movementsSince(productId, days).filter(m => !isIncoming(m.type)).reduce((s,m) => s + m.quantity, 0);
+}
+function inQtySince(productId, days) {
+  return movementsSince(productId, days).filter(m => isIncoming(m.type)).reduce((s,m) => s + m.quantity, 0);
+}
+// Ingreso unitario efectivo de un movimiento de salida: unitPrice del movimiento si se registró, si no el precio de lista del producto.
+function movementUnitPrice(m, product) {
+  const up = Number(m?.unitPrice);
+  if (up > 0) return up;
+  const p = product || store.products.find(pp => pp.id === m.productId);
+  return priceOf(p);
+}
+function movementRevenue(m, product) {
+  if (isIncoming(m.type)) return 0;
+  return m.quantity * movementUnitPrice(m, product);
+}
+function outRevenueSince(productId, days) {
+  const p = store.products.find(pp => pp.id === productId);
+  return movementsSince(productId, days)
+    .filter(m => !isIncoming(m.type))
+    .reduce((s, m) => s + movementRevenue(m, p), 0);
+}
+// Precio de venta promedio efectivo de los últimos N días. Útil para reportes de rentabilidad y ABC.
+function avgSalePrice(productId, days = 30) {
+  const p = store.products.find(pp => pp.id === productId);
+  const movs = movementsSince(productId, days).filter(m => !isIncoming(m.type));
+  const qty = movs.reduce((s,m) => s + m.quantity, 0);
+  if (qty === 0) return priceOf(p);
+  const rev = movs.reduce((s,m) => s + m.quantity * movementUnitPrice(m, p), 0);
+  return rev / qty;
+}
+function avgDailyOut(productId, days = 30) {
+  return outQtySince(productId, days) / days;
+}
+function daysOfCoverage(productId, days = 30) {
+  const v = avgDailyOut(productId, days);
+  if (v <= 0) return Infinity;
+  return stockOf(productId) / v;
+}
+function lastMovementAt(productId) {
+  const m = store.movements.filter(x => x.productId === productId)
+    .sort((a,b) => b.createdAt.localeCompare(a.createdAt))[0];
+  return m ? new Date(m.createdAt) : null;
+}
+function daysSinceLastMovement(productId) {
+  const d = lastMovementAt(productId);
+  return d ? Math.floor((Date.now() - d.getTime()) / DAY_MS) : Infinity;
+}
+
+function abcClassification(days = 30) {
+  const byId = {};
+  store.products.forEach(p => {
+    const out = outQtySince(p.id, days);
+    const val = outRevenueSince(p.id, days);
+    byId[p.id] = { p, out, val, cls: 'Z' };
+  });
+  const sorted = Object.values(byId).filter(x => x.val > 0).sort((a,b) => b.val - a.val);
+  const total = sorted.reduce((s,x) => s + x.val, 0);
+  let cum = 0;
+  sorted.forEach(x => {
+    cum += x.val;
+    const pct = total > 0 ? cum / total : 0;
+    x.cls = pct <= 0.80 ? 'A' : pct <= 0.95 ? 'B' : 'C';
+  });
+  const result = {};
+  Object.values(byId).forEach(x => { result[x.p.id] = x.cls; });
+  return result;
+}
+
+function suggestReorder(product, leadDays = 7, safetyDays = 3, targetDays = 30) {
+  const v = avgDailyOut(product.id, 30);
+  if (v <= 0) return null;
+  const stock = stockOf(product.id);
+  const daysLeft = stock / v;
+  if (daysLeft > leadDays + safetyDays + 3) return null;
+  const qty = Math.ceil(v * (targetDays + safetyDays) - stock);
+  if (qty <= 0) return null;
+  // Si ya no hay tiempo de recibir a tiempo (daysLeft ≤ leadDays), la orden es urgente
+  const urgent = daysLeft <= leadDays;
+  const reorderByDate = urgent ? null : new Date(Date.now() + (daysLeft - leadDays) * DAY_MS);
+  return { qty, daysLeft: Math.floor(daysLeft), reorderByDate, urgent, avgDaily: v };
+}
+
+function coverageLabel(days) {
+  if (!isFinite(days)) return { text:'sin consumo', color:'var(--muted)', level:'muted' };
+  if (days < 3)  return { text:`${days.toFixed(1)} días`, color:'var(--danger)',  level:'danger'  };
+  if (days < 10) return { text:`${days.toFixed(0)} días`, color:'var(--warning)', level:'warning' };
+  if (days > 90) return { text:`${days.toFixed(0)} días`, color:'var(--warning)', level:'warning' };
+  return { text:`${days.toFixed(0)} días`, color:'var(--success)', level:'ok' };
+}
+
+function computeInsights() {
+  const abc = abcClassification(30);
+  const urgent = [], toReorder = [], overstock = [], dead = [], noMargin = [], stars = [];
+  for (const p of store.products) {
+    const s   = stockOf(p.id);
+    const cov = daysOfCoverage(p.id, 30);
+    const last= daysSinceLastMovement(p.id);
+    const out = outQtySince(p.id, 30);
+    const cls = abc[p.id] || 'Z';
+    const mp  = marginPct(p);
+
+    if (s === 0 && out > 0) urgent.push(p);
+    else if (cov < 3)       urgent.push(p);
+    else if (cov < 10)      toReorder.push(p);
+
+    if (isFinite(cov) && cov > 90 && s > 0 && out > 0) overstock.push(p);
+    if (last >= 30 && s > 0) dead.push(p);
+    if (mp > 0 && mp < 10 && (cls === 'A' || cls === 'B')) noMargin.push(p);
+    if (mp > 30 && cls === 'A') stars.push(p);
+  }
+  const out = [];
+  if (urgent.length)    out.push({ level:'danger',  icon:'🚨', title:`${urgent.length} producto(s) requieren reposición urgente`,    message:'Cobertura menor a 3 días o sin stock con ventas recientes.', products:urgent });
+  if (toReorder.length) out.push({ level:'warning', icon:'⏰', title:`${toReorder.length} producto(s) se están agotando`,              message:'Entre 3 y 10 días de cobertura. Planifica la compra pronto.', products:toReorder });
+  if (overstock.length) out.push({ level:'warning', icon:'📦', title:`${overstock.length} producto(s) con sobrestock`,                message:'Más de 90 días de cobertura. Considera promociones o detener compras.', products:overstock });
+  if (dead.length)      out.push({ level:'warning', icon:'💤', title:`${dead.length} producto(s) sin movimiento hace 30+ días`,       message:'Candidatos a liquidar o descatalogar — ocupan capital.', products:dead });
+  if (noMargin.length)  out.push({ level:'info',    icon:'💸', title:`${noMargin.length} best-seller(s) con margen bajo`,             message:'Productos A/B con margen menor al 10%. Oportunidad para negociar costo o subir precio.', products:noMargin });
+  if (stars.length)     out.push({ level:'success', icon:'⭐', title:`${stars.length} producto(s) estrella`,                          message:'Alta rotación y margen superior al 30%. Mantenlos siempre surtidos.', products:stars });
+  if (!out.length)      out.push({ level:'success', icon:'✅', title:'Todo bajo control',                                              message:'No detectamos problemas críticos en el inventario.', products:[] });
+  return out;
+}
+
+function healthScore() {
+  const products = store.products;
+  if (products.length === 0) return { score:0, components:{ stock:0, rotation:0, dead:0, margin:0 } };
+  const stock = stockByProduct();
+  const ok    = products.filter(p => (stock[p.id] ?? 0) >= p.minStock).length;
+  const moved = products.filter(p => movementsSince(p.id, 30).length > 0).length;
+  const alive = products.filter(p => daysSinceLastMovement(p.id) < 30).length;
+  const margins = products.map(p => marginPct(p)).filter(m => m > 0);
+  const avgMargin = margins.length ? margins.reduce((a,b) => a+b, 0) / margins.length : 0;
+
+  const stockScore    = Math.round((ok    / products.length) * 100);
+  const rotationScore = Math.round((moved / products.length) * 100);
+  const deadScore     = Math.round((alive / products.length) * 100);
+  const marginScore   = Math.min(100, Math.round((avgMargin / 40) * 100));
+  const score = Math.round(stockScore * 0.35 + rotationScore * 0.25 + deadScore * 0.2 + marginScore * 0.2);
+  return { score, components:{ stock:stockScore, rotation:rotationScore, dead:deadScore, margin:marginScore } };
+}
+function scoreLabel(s) {
+  if (s >= 85) return { label:'Excelente', color:'var(--success)' };
+  if (s >= 70) return { label:'Bueno',     color:'var(--success)' };
+  if (s >= 50) return { label:'Regular',   color:'var(--warning)' };
+  return         { label:'Crítico',        color:'var(--danger)'  };
+}
+function scrollToId(id) {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+function gotoReportsTab(tab) {
+  reportTab = tab;
+  navigate('reports');
+}
+
+// ===================================================================
+//  INSIGHTS VIEW
+// ===================================================================
+function viewInsights() {
+  const insights = computeInsights();
+  const abc = abcClassification(30);
+  const abcCounts = { A:0, B:0, C:0, Z:0 };
+  store.products.forEach(p => abcCounts[abc[p.id] || 'Z']++);
+  const currency = store.tenant?.currency || 'COP';
+
+  const reorders = store.products.map(p => ({ p, s:suggestReorder(p) }))
+    .filter(x => x.s).sort((a,b) => a.s.daysLeft - b.s.daysLeft);
+
+  // Resumen rápido del estado del negocio, en lenguaje plano
+  const alertList   = lowStockProducts();
+  const alertCount  = alertList.length;
+  const reorderCnt  = reorders.length;
+  const deadList    = store.products.filter(p => daysSinceLastMovement(p.id) >= 30 && stockOf(p.id) > 0);
+  const deadCount   = deadList.length;
+
+  // Ventas de los últimos 7 días en dinero (usa unitPrice real de cada movimiento cuando existe)
+  const revenue7d = store.products.reduce((sum, p) => sum + outRevenueSince(p.id, 7), 0);
+  const units7d   = store.products.reduce((sum, p) => sum + outQtySince(p.id, 7), 0);
+
+  // Top vendedores de la semana con su aporte en dinero
+  const topSellers7d = store.products
+    .map(p => ({ p, qty: outQtySince(p.id, 7), revenue: outRevenueSince(p.id, 7) }))
+    .filter(x => x.qty > 0)
+    .sort((a,b) => b.revenue - a.revenue);
+
+  // Mood general del negocio basado en alertas + reposiciones urgentes
+  let mood;
+  if (alertCount === 0 && reorderCnt === 0) {
+    mood = { icon:'🟢', color:'var(--success)', bg:'var(--success-soft)', title:'Todo bajo control', msg:'Tu inventario está bien surtido y no hay productos críticos. Buen momento para enfocarte en ventas.' };
+  } else if (alertCount + reorderCnt <= 3) {
+    mood = { icon:'🟡', color:'var(--warning)', bg:'var(--warning-soft)', title:'Algunos puntos de atención', msg:`Hay ${alertCount + reorderCnt} producto(s) que conviene revisar pronto. Revisa las recomendaciones abajo.` };
+  } else {
+    mood = { icon:'🔴', color:'var(--danger)',  bg:'var(--danger-soft)',  title:'Requiere tu atención hoy', msg:`Tienes varios productos en alerta o por agotarse. Empieza por la lista de reposición urgente.` };
+  }
+
+  const friendlyCards = [
+    { k:'A', emoji:'⭐', label:'Estrellas',      hint:'Los que más te dan plata',          color:'#15803d', bg:'#dcfce7' },
+    { k:'B', emoji:'💪', label:'Buenos',          hint:'Aportan bien al negocio',           color:'#b45309', bg:'#fef3c7' },
+    { k:'C', emoji:'🔹', label:'Secundarios',     hint:'Aportan poco',                      color:'#4338ca', bg:'#e0e7ff' },
+    { k:'Z', emoji:'💤', label:'Sin actividad',   hint:'No se vendieron el último mes',     color:'#64748b', bg:'#f1f5f9' },
+  ];
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">🧠 Inteligencia del inventario</h1>
+          <div class="page-subtitle">Resumen del negocio, recomendaciones y pronóstico de reposición.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openChat()">💬 Preguntar al asistente</button>
+      </div>
+
+      <section class="card" style="border-left:6px solid ${mood.color}">
+        <div style="display:flex;gap:16px;align-items:center">
+          <div style="font-size:42px;line-height:1">${mood.icon}</div>
+          <div style="flex:1">
+            <h2 style="margin:0 0 4px;color:${mood.color}">${mood.title}</h2>
+            <div style="color:var(--text);font-size:14px">${mood.msg}</div>
+          </div>
+        </div>
+        <div class="grid grid-4" style="margin-top:16px">
+
+          <div class="summary-card" style="background:var(--primary-soft)" onclick="gotoReportsTab('top-products')">
+            <div class="summary-card-label">💰 Vendido esta semana</div>
+            <div class="summary-card-value" style="color:var(--primary)">${formatMoney(revenue7d, currency)}</div>
+            <div class="summary-card-sub">${units7d} unidad(es) en 7 días</div>
+            <div class="summary-card-list">
+              ${topSellers7d.length > 0
+                ? topSellers7d.slice(0,3).map(x => `<div class="summary-card-item"><span class="summary-card-item-name">${esc(x.p.name)}</span><span class="summary-card-item-val">${formatMoney(x.revenue, currency)}</span></div>`).join('')
+                  + (topSellers7d.length > 3 ? `<div class="summary-card-more">+ ${topSellers7d.length - 3} más</div>` : '')
+                : `<div class="summary-card-ok">Sin ventas registradas esta semana.</div>`}
+            </div>
+            <div class="summary-card-cta">Ver top productos →</div>
+          </div>
+
+          <div class="summary-card" style="background:${alertCount > 0 ? 'var(--danger-soft)' : 'var(--surface-2)'}" onclick="navigate('alerts')">
+            <div class="summary-card-label">🔔 En alerta</div>
+            <div class="summary-card-value" style="color:${alertCount > 0 ? 'var(--danger)' : 'var(--text)'}">${alertCount}</div>
+            <div class="summary-card-sub">Bajo el stock mínimo</div>
+            <div class="summary-card-list">
+              ${alertList.length > 0
+                ? alertList.slice(0,3).map(p => `<div class="summary-card-item"><span class="summary-card-item-name">${esc(p.name)}</span><span class="summary-card-item-val">${p.current}/${p.minStock} ${esc(p.unit)}</span></div>`).join('')
+                  + (alertList.length > 3 ? `<div class="summary-card-more">+ ${alertList.length - 3} más</div>` : '')
+                : `<div class="summary-card-ok">✓ Todo por encima del mínimo</div>`}
+            </div>
+            <div class="summary-card-cta">Ver alertas →</div>
+          </div>
+
+          <div class="summary-card" style="background:${reorderCnt > 0 ? 'var(--warning-soft)' : 'var(--surface-2)'}" onclick="scrollToId('forecast-section')">
+            <div class="summary-card-label">🔮 Por reponer pronto</div>
+            <div class="summary-card-value" style="color:${reorderCnt > 0 ? 'var(--warning)' : 'var(--text)'}">${reorderCnt}</div>
+            <div class="summary-card-sub">Se acabarán en los próximos días</div>
+            <div class="summary-card-list">
+              ${reorders.length > 0
+                ? reorders.slice(0,3).map(r => `<div class="summary-card-item"><span class="summary-card-item-name">${esc(r.p.name)}</span><span class="summary-card-item-val">${r.s.daysLeft}d restantes</span></div>`).join('')
+                  + (reorders.length > 3 ? `<div class="summary-card-more">+ ${reorders.length - 3} más</div>` : '')
+                : `<div class="summary-card-ok">✓ Ningún producto necesita reposición</div>`}
+            </div>
+            <div class="summary-card-cta">Ver pronóstico ↓</div>
+          </div>
+
+          <div class="summary-card" style="background:${deadCount > 0 ? 'var(--warning-soft)' : 'var(--surface-2)'}" onclick="navigate('products')">
+            <div class="summary-card-label">💤 Sin movimiento</div>
+            <div class="summary-card-value" style="color:${deadCount > 0 ? 'var(--warning)' : 'var(--text)'}">${deadCount}</div>
+            <div class="summary-card-sub">No se han vendido en 30 días</div>
+            <div class="summary-card-list">
+              ${deadList.length > 0
+                ? deadList.slice(0,3).map(p => `<div class="summary-card-item"><span class="summary-card-item-name">${esc(p.name)}</span><span class="summary-card-item-val">${stockOf(p.id)} ${esc(p.unit)}</span></div>`).join('')
+                  + (deadList.length > 3 ? `<div class="summary-card-more">+ ${deadList.length - 3} más</div>` : '')
+                : `<div class="summary-card-ok">✓ Todos tus productos tienen actividad reciente</div>`}
+            </div>
+            <div class="summary-card-cta">Ver catálogo →</div>
+          </div>
+
+        </div>
+      </section>
+
+      <section class="card mt-16">
+        <div class="row-between" style="margin-bottom:6px">
+          <h2 style="margin:0">Cómo se comportan tus productos</h2>
+          <span class="text-muted" style="font-size:12px">Últimos 30 días</span>
+        </div>
+        <div class="text-muted" style="font-size:13px;margin-bottom:14px">Agrupados según cuánta plata generan en ventas — te ayuda a saber a cuáles ponerle más atención.</div>
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
+          ${friendlyCards.map(t => `
+            <div class="abc-card" style="background:${t.bg}">
+              <div style="font-size:22px;margin-bottom:4px">${t.emoji}</div>
+              <div class="abc-count" style="color:${t.color}">${abcCounts[t.k]}</div>
+              <div class="abc-label" style="color:${t.color}">${t.label}</div>
+              <div class="abc-hint">${t.hint}</div>
+            </div>`).join('')}
+        </div>
+        <details class="explain">
+          <summary>¿Cómo agrupa el sistema mis productos?</summary>
+          <p>Ordenamos tus productos por <strong>cuánta plata generaron en ventas los últimos 30 días</strong> (cantidad × precio). Luego los agrupamos así:</p>
+          <ul>
+            <li>⭐ <strong>Estrellas</strong>: los productos que, sumados, te dan el primer 80% del dinero. <em>No pueden faltarte nunca</em> — son los que mueven tu negocio.</li>
+            <li>💪 <strong>Buenos</strong>: contribuyen entre el 80% y el 95% del dinero. Importantes pero con más margen de error si se agotan un día.</li>
+            <li>🔹 <strong>Secundarios</strong>: aportan el último 5% del ingreso. Son de variedad, no críticos.</li>
+            <li>💤 <strong>Sin actividad</strong>: no tuvieron ventas este mes. Son candidatos a rebajar, promocionar o dejar de comprar.</li>
+          </ul>
+          <p><strong>Idea clave:</strong> pocos productos suelen generar la mayor parte del dinero. Saber cuáles son te ayuda a decidir dónde enfocar atención, capital y negociaciones con proveedores.</p>
+        </details>
+      </section>
+
+      <section class="card mt-16">
+        <h2 style="margin:0 0 12px">🔍 Recomendaciones automáticas</h2>
+        ${insights.map(i => `
+          <div class="insight ${i.level}">
+            <div class="insight-icon">${i.icon}</div>
+            <div>
+              <div class="insight-title">${esc(i.title)}</div>
+              <div class="insight-msg">${esc(i.message)}</div>
+              ${i.products.length ? `<div class="insight-products">
+                ${i.products.slice(0, 8).map(p => `<span class="insight-chip">${esc(p.name)}</span>`).join('')}
+                ${i.products.length > 8 ? `<span class="insight-chip">+${i.products.length - 8}</span>` : ''}
+              </div>` : ''}
+            </div>
+          </div>`).join('')}
+      </section>
+
+      <section class="card mt-16" id="forecast-section">
+        <div class="row-between" style="margin-bottom:12px">
+          <div>
+            <h2 style="margin:0">🔮 Pronóstico de reposición</h2>
+            <div class="text-muted" style="font-size:13px">Asume lead time 7 días, stock de seguridad 3 días, cobertura objetivo 30 días.</div>
+          </div>
+          <span class="badge badge-info">${reorders.length} sugerencia(s)</span>
+        </div>
+        ${reorders.length === 0
+          ? `<div class="empty"><div class="empty-icon">✅</div><strong>Sin urgencias</strong><div>Ningún producto necesita reposición inmediata.</div></div>`
+          : `<table class="table"><thead><tr>
+              <th>Producto</th>
+              <th class="num">Stock actual</th>
+              <th class="num">Consumo diario</th>
+              <th class="num">Días restantes</th>
+              <th class="num">Cantidad sugerida</th>
+              <th>Pedir antes del</th>
+            </tr></thead><tbody>
+            ${reorders.map(r => `<tr>
+              <td>
+                <div style="font-weight:500">${esc(r.p.name)}</div>
+                <div style="font-size:11px;color:var(--muted)">${esc(r.p.sku)}</div>
+              </td>
+              <td class="num">${stockOf(r.p.id)} ${esc(r.p.unit)}</td>
+              <td class="num">${r.s.avgDaily.toFixed(2)} ${esc(r.p.unit)}/día</td>
+              <td class="num" style="color:${r.s.daysLeft <= 3 ? 'var(--danger)' : 'var(--warning)'};font-weight:600">${r.s.daysLeft}</td>
+              <td class="num"><strong>${r.s.qty}</strong> ${esc(r.p.unit)}</td>
+              <td>${r.s.urgent
+                ? '<span style="color:var(--danger);font-weight:700">🚨 Pedir ya</span>'
+                : r.s.reorderByDate.toLocaleDateString('es')}</td>
+            </tr>`).join('')}
+            </tbody></table>`}
+        <details class="explain">
+          <summary>¿Cómo se calcula la sugerencia?</summary>
+          <p>Para cada producto estimamos cuánto se consume por día y proyectamos cuándo se va a acabar el stock. La sugerencia considera el tiempo que tarda el proveedor en entregar.</p>
+          <ul>
+            <li><strong>Consumo diario</strong> = salidas de los últimos 30 días ÷ 30.</li>
+            <li><strong>Días restantes</strong> = stock actual ÷ consumo diario.</li>
+            <li><strong>Cantidad sugerida</strong> = consumo diario × (30 + 3 días de seguridad) − stock actual. Así el pedido cubre un mes y te deja margen para imprevistos.</li>
+            <li><strong>Pedir antes del</strong>: se resta el <strong>lead time</strong> (tiempo que tarda el proveedor) a los días restantes para que el producto llegue antes de agotarse.</li>
+          </ul>
+          <p><strong>Supuestos actuales:</strong> lead time de 7 días, stock de seguridad de 3 días, cobertura objetivo de 30 días. Un producto entra en la lista cuando su cobertura es menor al lead time + seguridad. Los productos sin ventas en 30 días no aparecen porque no se puede estimar consumo.</p>
+        </details>
+      </section>
+    </div>`;
+}
+
+// ===================================================================
+//  CHAT ASSISTANT — parser de lenguaje natural
+// ===================================================================
+let chatState = { open:false, messages:[] };
+
+function openChat() {
+  chatState.open = true;
+  if (chatState.messages.length === 0) {
+    chatState.messages.push({ role:'bot', text:'¡Hola! Soy el asistente de Inventra. Pregúntame en lenguaje natural sobre stock, ventas, alertas o pídeme un reporte rápido.' });
+  }
+  renderChat();
+}
+function closeChat() { chatState.open = false; renderChat(); }
+function sendChatInput() {
+  const i = document.getElementById('chat-input');
+  const v = (i?.value || '').trim();
+  if (!v) return;
+  sendChat(v);
+  if (i) i.value = '';
+}
+function sendChat(text) {
+  chatState.messages.push({ role:'user', text });
+  const reply = chatReply(text);
+  chatState.messages.push({ role:'bot', text: reply });
+  renderChat();
+  setTimeout(() => {
+    const body = document.getElementById('chat-body');
+    if (body) body.scrollTop = body.scrollHeight;
+    document.getElementById('chat-input')?.focus();
+  }, 20);
+}
+function chatFindProduct(text) {
+  const t = text.toLowerCase();
+  return store.products.find(p =>
+    t.includes(p.name.toLowerCase()) ||
+    t.includes(p.sku.toLowerCase()) ||
+    p.name.toLowerCase().split(/\s+/).some(w => w.length > 3 && t.includes(w))
+  );
+}
+function chatReply(text) {
+  const t = text.toLowerCase().trim();
+  const currency = store.tenant?.currency || 'COP';
+  const windowDays = /semana/.test(t) ? 7 : /hoy/.test(t) ? 1 : 30;
+
+  if (/(hola|buen[oa]s|hey|hi\b)/.test(t)) return '¡Hola! ¿Qué quieres consultar? Dime por ejemplo: "stock de arroz", "qué debo reponer", "top productos" o "valor de inventario".';
+  if (/(ayuda|help|qu[eé] pod[eé]s)/.test(t)) return 'Puedo ayudarte con:\n• Stock de un producto\n• Ventas / compras del período\n• Alertas y reposiciones sugeridas\n• Top productos por rotación\n• Valor del inventario\n• Margen y rentabilidad\n• Productos sin movimiento\n• Salud general del inventario';
+
+  if (/(repon|pedir|compr|cu[aá]ndo.*ped|pron[oó]stic|reabastec|sugier)/.test(t)) {
+    const rs = store.products.map(p => ({ p, s:suggestReorder(p) })).filter(x => x.s)
+      .sort((a,b) => a.s.daysLeft - b.s.daysLeft);
+    if (rs.length === 0) return '✅ Nada urgente por pedir. Todo el stock tiene cobertura holgada.';
+    return '🔮 Próximas reposiciones sugeridas:\n' + rs.slice(0,6).map(x =>
+      `• ${x.p.name}: pedir ${x.s.qty} ${x.p.unit} ${x.s.urgent ? '🚨 YA' : 'antes del ' + x.s.reorderByDate.toLocaleDateString('es')} (${x.s.daysLeft}d restantes)`
+    ).join('\n');
+  }
+
+  if (/(alert|bajo|m[ií]nim|urge)/.test(t)) {
+    const low = lowStockProducts();
+    if (low.length === 0) return '✅ No hay productos bajo el mínimo.';
+    return `🚨 ${low.length} producto(s) bajo el mínimo:\n` + low.slice(0,6).map(p =>
+      `• ${p.name} — ${p.current}/${p.minStock} ${p.unit}`
+    ).join('\n') + (low.length > 6 ? `\n… y ${low.length - 6} más.` : '');
+  }
+
+  if (/(muert|sin movimiento|no se mueve|no vend)/.test(t)) {
+    const dead = store.products.filter(p => daysSinceLastMovement(p.id) >= 30 && stockOf(p.id) > 0);
+    if (dead.length === 0) return '✅ Todos tus productos con stock han tenido movimiento en los últimos 30 días.';
+    return `💤 ${dead.length} producto(s) sin movimiento 30+ días:\n` + dead.slice(0,6).map(p => `• ${p.name} (stock ${stockOf(p.id)} ${p.unit})`).join('\n');
+  }
+
+  if (/(top|m[aá]s (vend|salid)|ranking|estrell)/.test(t)) {
+    const rows = store.products.map(p => ({ p, out:outQtySince(p.id, windowDays) }))
+      .filter(x => x.out > 0).sort((a,b) => b.out - a.out).slice(0,5);
+    if (rows.length === 0) return 'Aún no hay movimientos para calcular un top.';
+    return `🏆 Top 5 por salidas (${windowDays} días):\n` + rows.map((r,i) => `${i+1}. ${r.p.name} — ${r.out} ${r.p.unit}`).join('\n');
+  }
+
+  if (/(valor|cu[aá]nto (plata|dinero)|capital|parad)/.test(t)) {
+    const s = stockByProduct();
+    const valPrice = store.products.reduce((a,p) => a + (s[p.id] ?? 0) * priceOf(p), 0);
+    const valCost  = store.products.reduce((a,p) => a + (s[p.id] ?? 0) * costOf(p), 0);
+    return `💰 Valor del inventario:\n• A precio de venta: ${formatMoney(valPrice, currency)}\n• A costo: ${formatMoney(valCost, currency)}\n• Ganancia potencial: ${formatMoney(valPrice - valCost, currency)}`;
+  }
+
+  if (/(margen|rentabil|utilidad|ganan)/.test(t)) {
+    const p = chatFindProduct(t);
+    if (p) {
+      if (!hasCost(p)) return `⚠️ ${p.name}: falta el costo unitario. Edita el producto para ingresarlo y poder calcular margen y utilidad.`;
+      return `📊 ${p.name}: margen ${marginPct(p).toFixed(1)}%\n• Costo: ${formatMoney(costOf(p), currency)}\n• Precio: ${formatMoney(priceOf(p), currency)}\n• Utilidad unitaria: ${formatMoney(priceOf(p) - costOf(p), currency)}`;
+    }
+    const withCost = store.products.filter(hasCost);
+    if (withCost.length === 0) return '⚠️ Ningún producto tiene costo cargado. Edita los productos para ingresar el costo unitario y obtener márgenes.';
+    const avg = withCost.reduce((a,p) => a + marginPct(p), 0) / withCost.length;
+    const total = store.products.length;
+    const missing = total - withCost.length;
+    return `📊 Margen promedio del catálogo: ${avg.toFixed(1)}% (calculado sobre ${withCost.length}/${total} productos con costo)${missing > 0 ? `.\n⚠️ ${missing} producto(s) sin costo cargado no se incluyen.` : '.'}`;
+  }
+
+  if (/(vend|venta|sali|sacado)/.test(t)) {
+    const p = chatFindProduct(t);
+    if (p) {
+      const q = outQtySince(p.id, windowDays);
+      const revenue = outRevenueSince(p.id, windowDays);
+      return `📤 ${p.name}: ${q} ${p.unit}(s) vendidos en ${windowDays} días\n• Ingresos: ${formatMoney(revenue, currency)}`;
+    }
+    const total = store.products.reduce((a,p) => a + outQtySince(p.id, windowDays), 0);
+    const revenue = store.products.reduce((a,p) => a + outRevenueSince(p.id, windowDays), 0);
+    return `📤 Ventas últimos ${windowDays} días: ${total} unidad(es) · Ingresos: ${formatMoney(revenue, currency)}`;
+  }
+
+  if (/(compr|entrada|ingres|recibi)/.test(t)) {
+    const p = chatFindProduct(t);
+    if (p) return `📥 ${p.name}: entraron ${inQtySince(p.id, windowDays)} ${p.unit}(s) en ${windowDays} días.`;
+    const total = store.products.reduce((a,p) => a + inQtySince(p.id, windowDays), 0);
+    return `📥 Entradas totales en ${windowDays} días: ${total} unidad(es).`;
+  }
+
+  if (/(cobertura|d[ií]as? resta|hasta cu[aá]ndo|aguant)/.test(t)) {
+    const p = chatFindProduct(t);
+    if (p) {
+      const cov = daysOfCoverage(p.id, 30);
+      const v = avgDailyOut(p.id, 30);
+      if (!isFinite(cov)) return `${p.name} no tuvo ventas en 30 días, no se puede estimar cobertura.`;
+      return `⏳ ${p.name}: cobertura de ${cov.toFixed(1)} días\n• Stock: ${stockOf(p.id)} ${p.unit}\n• Consumo: ${v.toFixed(2)} ${p.unit}/día`;
+    }
+    return 'Dime un producto para calcular días de cobertura. Ej: "cobertura de gaseosa".';
+  }
+
+  if (/(stock|cu[aá]nto tengo|hay de|qued[ao]n)/.test(t)) {
+    const p = chatFindProduct(t);
+    if (p) return `📦 ${p.name}: ${stockOf(p.id)} ${p.unit} (mínimo ${p.minStock}). ${stockOf(p.id) < p.minStock ? '⚠️ Bajo el mínimo.' : '✅ OK.'}`;
+    return `Hay ${totalUnits()} unidad(es) distribuidas en ${store.products.length} productos. Dime un producto específico para el detalle.`;
+  }
+
+  if (/(salud|score|estado general|c[oó]mo (va|estoy|est[aá])n?)/.test(t)) {
+    const { score, components } = healthScore();
+    return `🧠 Salud del inventario: ${score}/100 (${scoreLabel(score).label})\n• Stock OK: ${components.stock}%\n• Rotación: ${components.rotation}%\n• Sin stock muerto: ${components.dead}%\n• Margen: ${components.margin}%`;
+  }
+
+  if (/(abc|clasific)/.test(t)) {
+    const abc = abcClassification(30);
+    const counts = { A:0, B:0, C:0, Z:0 };
+    store.products.forEach(p => counts[abc[p.id] || 'Z']++);
+    return `🔤 Clasificación ABC (30 días):\n• A (alta): ${counts.A}\n• B (media): ${counts.B}\n• C (baja): ${counts.C}\n• Sin movimiento: ${counts.Z}`;
+  }
+
+  const p = chatFindProduct(t);
+  if (p) return `Encontré "${p.name}". Stock: ${stockOf(p.id)} ${p.unit}, precio ${formatMoney(priceOf(p), currency)}, margen ${marginPct(p).toFixed(1)}%. ¿Qué quieres saber sobre él?`;
+
+  return 'No estoy seguro de entender. Prueba con: "qué debo reponer", "stock de arroz", "top productos", "valor de inventario", "productos muertos" o "ayuda".';
+}
+function renderChat() {
+  const root = document.getElementById('chat-root');
+  if (!root) return;
+  if (!chatState.open) {
+    root.innerHTML = `<button class="fab" onclick="openChat()" title="Asistente Inventra" aria-label="Abrir asistente">💬</button>`;
+    return;
+  }
+  const chips = ['¿Qué debo reponer?','Stock bajo','Top productos','Valor de inventario','Margen promedio','Productos muertos','Salud del inventario'];
+  root.innerHTML = `
+    <div class="chat-drawer">
+      <div class="chat-header">
+        <div>
+          <div style="font-weight:600;font-size:14px">🤖 Asistente Inventra</div>
+          <div style="font-size:11px;opacity:.85">Consultas en lenguaje natural</div>
+        </div>
+        <button class="close-x" onclick="closeChat()" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="chat-body" id="chat-body">
+        ${chatState.messages.map(m => `<div class="chat-msg ${m.role}">${esc(m.text)}</div>`).join('')}
+      </div>
+      <div class="chat-suggestions">
+        ${chips.map(c => `<button class="chat-chip" onclick='sendChat(${JSON.stringify(c)})'>${esc(c)}</button>`).join('')}
+      </div>
+      <form class="chat-input" onsubmit="event.preventDefault();sendChatInput()">
+        <input id="chat-input" placeholder="Pregunta en lenguaje natural…" autocomplete="off" autofocus/>
+        <button type="submit" class="btn btn-primary btn-sm">Enviar</button>
+      </form>
+    </div>`;
+  setTimeout(() => {
+    const body = document.getElementById('chat-body');
+    if (body) body.scrollTop = body.scrollHeight;
+    document.getElementById('chat-input')?.focus();
+  }, 20);
+}
+
+// ----- Reports view
+let reportFilters = { from:'', to:'', productId:'', category:'', type:'' };
+let reportTab = 'inventory';
+const REPORT_TABS = [
+  { key:'inventory',     label:'Inventario actual' },
+  { key:'movements',     label:'Movimientos' },
+  { key:'by-category',   label:'Por categoría' },
+  { key:'top-products',  label:'Top productos' },
+  { key:'profitability', label:'Rentabilidad' },
+  { key:'forecast',      label:'Pronóstico' },
+];
+
+function inDateRange(iso, from, to) {
+  const t = new Date(iso).getTime();
+  if (from && t < new Date(from + 'T00:00:00').getTime()) return false;
+  if (to   && t > new Date(to   + 'T23:59:59').getTime()) return false;
+  return true;
+}
+function formatMoney(n, currency) {
+  try { return new Intl.NumberFormat('es-CO', { style:'currency', currency, maximumFractionDigits:0 }).format(n); }
+  catch { return `${currency} ${Math.round(n).toLocaleString('es-CO')}`; }
+}
+function clearReportFilters() {
+  reportFilters = { from:'', to:'', productId:'', category:'', type:'' };
+  render();
+}
+function computeReportData() {
+  const filteredProducts = store.products.filter(p => {
+    if (reportFilters.category  && p.category !== reportFilters.category)  return false;
+    if (reportFilters.productId && p.id       !== reportFilters.productId) return false;
+    return true;
+  });
+  const pIds = new Set(filteredProducts.map(p => p.id));
+  const filteredMovements = store.movements.filter(m => {
+    if (!pIds.has(m.productId)) return false;
+    if (reportFilters.type && m.type !== reportFilters.type) return false;
+    if (!inDateRange(m.createdAt, reportFilters.from, reportFilters.to)) return false;
+    return true;
+  });
+  return { filteredProducts, filteredMovements, stock: stockByProduct() };
+}
+
+function viewReports() {
+  const currency = store.tenant?.currency || 'COP';
+  const cats = categories();
+  const { filteredProducts, filteredMovements, stock } = computeReportData();
+
+  let totalIn = 0, totalOut = 0;
+  filteredMovements.forEach(m => { isIncoming(m.type) ? totalIn += m.quantity : totalOut += m.quantity; });
+  const totalUnitsFiltered = filteredProducts.reduce((s,p) => s + Math.max(0, stock[p.id] ?? 0), 0);
+  const inventoryValue     = filteredProducts.reduce((s,p) => s + (stock[p.id] ?? 0) * (p.price ?? 0), 0);
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Reportes</h1>
+          <div class="page-subtitle">Análisis, trazabilidad y exportación de datos del inventario.</div>
+        </div>
+        <div class="row">
+          <button class="btn btn-sm" onclick="clearReportFilters()">Limpiar filtros</button>
+          <button class="btn btn-primary btn-sm" onclick="exportReportCsv()">⬇️ Exportar CSV</button>
+        </div>
+      </div>
+
+      <section class="card">
+        <h3 style="margin:0 0 12px">Filtros</h3>
+        <div class="form-grid">
+          <div class="field"><label>Desde</label>
+            <input type="date" value="${esc(reportFilters.from)}" onchange="reportFilters.from=this.value;render()"/>
+          </div>
+          <div class="field"><label>Hasta</label>
+            <input type="date" value="${esc(reportFilters.to)}" onchange="reportFilters.to=this.value;render()"/>
+          </div>
+          <div class="field"><label>Producto</label>
+            <select onchange="reportFilters.productId=this.value;render()">
+              <option value="">Todos los productos</option>
+              ${store.products.map(p => `<option value="${p.id}" ${reportFilters.productId===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Categoría</label>
+            <select onchange="reportFilters.category=this.value;render()">
+              <option value="">Todas las categorías</option>
+              ${cats.map(c => `<option value="${esc(c)}" ${reportFilters.category===c?'selected':''}>${esc(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field"><label>Tipo de movimiento</label>
+            <select onchange="reportFilters.type=this.value;render()">
+              <option value="">Todos los tipos</option>
+              <option value="in"         ${reportFilters.type==='in'        ?'selected':''}>Entradas</option>
+              <option value="out"        ${reportFilters.type==='out'       ?'selected':''}>Salidas</option>
+              <option value="adjust_pos" ${reportFilters.type==='adjust_pos'?'selected':''}>Ajuste (+)</option>
+              <option value="adjust_neg" ${reportFilters.type==='adjust_neg'?'selected':''}>Ajuste (−)</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <div class="grid grid-4 mt-16">
+        <div class="stat-card">
+          <div class="stat-label">Productos filtrados</div>
+          <div class="stat-value">${filteredProducts.length}</div>
+          <div class="stat-hint">${totalUnitsFiltered} unidad(es) en stock</div>
+        </div>
+        <div class="stat-card ok">
+          <div class="stat-label">Entradas</div>
+          <div class="stat-value">${totalIn}</div>
+          <div class="stat-hint">Suma del período</div>
+        </div>
+        <div class="stat-card ${totalOut>totalIn?'alert':''}">
+          <div class="stat-label">Salidas</div>
+          <div class="stat-value">${totalOut}</div>
+          <div class="stat-hint">Neto: ${(totalIn-totalOut)>=0?'+':''}${totalIn-totalOut}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Valor de inventario</div>
+          <div class="stat-value" style="font-size:22px">${formatMoney(inventoryValue, currency)}</div>
+          <div class="stat-hint">Stock × precio unitario</div>
+        </div>
+      </div>
+
+      <section class="card mt-16">
+        <div class="row" style="margin-bottom:12px">
+          <div class="row" style="gap:6px">
+            ${REPORT_TABS.map(t => `<button class="btn btn-sm ${reportTab===t.key?'btn-primary':''}" onclick="reportTab='${t.key}';render()">${t.label}</button>`).join('')}
+          </div>
+          <div class="spacer"></div>
+          <span class="badge badge-muted">${filteredMovements.length} movimiento(s) en el rango</span>
+        </div>
+        ${renderReportTab(filteredProducts, filteredMovements, stock, currency)}
+      </section>
+    </div>`;
+}
+
+function renderReportTab(products, movements, stock, currency) {
+  if (reportTab === 'movements')     return renderMovementsReport(movements);
+  if (reportTab === 'by-category')   return renderCategoryReport(products, movements, stock, currency);
+  if (reportTab === 'top-products')  return renderTopProductsReport(products, movements, stock);
+  if (reportTab === 'profitability') return renderProfitabilityReport(products, movements, currency);
+  if (reportTab === 'forecast')      return renderForecastReport(products);
+  return renderInventoryReport(products, movements, stock, currency);
+}
+
+function renderProfitabilityReport(products, movements, currency) {
+  if (products.length === 0) return `<div class="empty"><div class="empty-icon">💰</div><strong>Sin datos</strong><div>Ajusta los filtros.</div></div>`;
+  // Agrupa por producto: cantidad e ingresos con el precio real de cada movimiento.
+  const byProduct = {};
+  movements.forEach(m => {
+    if (isIncoming(m.type)) return;
+    const b = byProduct[m.productId] ||= { qty:0, revenue:0 };
+    b.qty += m.quantity;
+    b.revenue += movementRevenue(m);
+  });
+  const rows = products.map(p => {
+    const b = byProduct[p.id] || { qty:0, revenue:0 };
+    const qty = b.qty;
+    const revenue = b.revenue;
+    const withCost = hasCost(p);
+    const cogs    = withCost ? qty * costOf(p) : 0;
+    const profit  = withCost ? revenue - cogs  : 0;
+    const avgPrice = qty > 0 ? revenue / qty : priceOf(p);
+    return { p, qty, revenue, cogs, profit, withCost, avgPrice };
+  }).sort((a,b) => b.profit - a.profit);
+
+  // Totales — solo cuentan productos con costo definido (para no inflar utilidad con COGS = 0)
+  const tot = rows.reduce((a,r) => r.withCost
+    ? { qty:a.qty+r.qty, revenue:a.revenue+r.revenue, cogs:a.cogs+r.cogs, profit:a.profit+r.profit }
+    : a
+  , { qty:0, revenue:0, cogs:0, profit:0 });
+  const totalMargin = tot.revenue > 0 ? (tot.profit / tot.revenue) * 100 : 0;
+  const missingCost = rows.filter(r => !r.withCost && r.qty > 0).length;
+
+  return `
+    <div class="insight info" style="margin-bottom:14px">
+      <div class="insight-icon">📐</div>
+      <div>
+        <div class="insight-title">Método de valoración: ${valuationMethodLabel()}</div>
+        <div class="insight-msg">El COGS se calcula con el costo unitario efectivo del producto, derivado de las compras registradas.</div>
+      </div>
+    </div>
+    ${missingCost > 0 ? `<div class="insight warning" style="margin-bottom:14px">
+      <div class="insight-icon">⚠️</div>
+      <div>
+        <div class="insight-title">${missingCost} producto(s) vendidos sin costo cargado</div>
+        <div class="insight-msg">La utilidad y el COGS no se calculan para estos productos. Edítalos o registra entradas con costo unitario para obtener el margen real.</div>
+      </div>
+    </div>` : ''}
+    <div class="grid grid-4" style="margin-bottom:16px">
+      <div class="stat-card"><div class="stat-label">Ingresos</div><div class="stat-value" style="font-size:22px">${formatMoney(tot.revenue, currency)}</div><div class="stat-hint">Solo productos con costo</div></div>
+      <div class="stat-card"><div class="stat-label">COGS</div><div class="stat-value" style="font-size:22px">${formatMoney(tot.cogs, currency)}</div><div class="stat-hint">Costo mercancía vendida</div></div>
+      <div class="stat-card ok"><div class="stat-label">Utilidad bruta</div><div class="stat-value" style="font-size:22px;color:var(--success)">${formatMoney(tot.profit, currency)}</div><div class="stat-hint">Ingresos − COGS</div></div>
+      <div class="stat-card"><div class="stat-label">Margen bruto</div><div class="stat-value">${totalMargin.toFixed(1)}%</div><div class="stat-hint">Utilidad / ingresos</div></div>
+    </div>
+    <table class="table"><thead><tr>
+      <th>Producto</th><th>Categoría</th>
+      <th class="num">Unidades vendidas</th>
+      <th class="num">Precio prom.</th>
+      <th class="num">Ingresos</th>
+      <th class="num">COGS</th>
+      <th class="num">Utilidad</th>
+      <th class="num">Margen</th>
+    </tr></thead><tbody>
+    ${rows.map(r => {
+      const listPrice = priceOf(r.p);
+      const diff = r.qty > 0 && listPrice > 0 ? ((r.avgPrice - listPrice) / listPrice) * 100 : 0;
+      const priceHint = r.qty > 0 && Math.abs(diff) >= 0.5
+        ? `<div style="font-size:10px;color:${diff < 0 ? 'var(--warning)' : 'var(--success)'}">${diff>0?'+':''}${diff.toFixed(1)}% vs lista</div>`
+        : '';
+      return `<tr${!r.withCost && r.qty > 0 ? ' style="opacity:.7"' : ''}>
+      <td>
+        <div style="font-weight:500">${esc(r.p.name)}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(r.p.sku)}</div>
+      </td>
+      <td>${esc(r.p.category)}</td>
+      <td class="num">${r.qty} ${esc(r.p.unit)}</td>
+      <td class="num">${r.qty > 0 ? formatMoney(r.avgPrice, currency) : '<span class="text-muted">—</span>'}${priceHint}</td>
+      <td class="num">${formatMoney(r.revenue, currency)}</td>
+      <td class="num">${r.withCost ? formatMoney(r.cogs, currency) : '<span class="text-muted">—</span>'}</td>
+      <td class="num" style="color:${r.withCost ? (r.profit >= 0 ? 'var(--success)' : 'var(--danger)') : 'var(--muted)'};font-weight:${r.withCost?600:400}">${r.withCost ? formatMoney(r.profit, currency) : '—'}</td>
+      <td class="num">${r.withCost && r.qty > 0
+        ? `<span class="badge ${r.revenue>0 && r.profit/r.revenue>=0.30 ? 'badge-ok' : r.revenue>0 && r.profit/r.revenue>=0.15 ? 'badge-info' : r.profit>0 ? 'badge-warn' : 'badge-muted'}">${r.revenue>0 ? ((r.profit/r.revenue)*100).toFixed(1) : '0.0'}%</span>`
+        : marginBadge(r.p)}</td>
+    </tr>`;
+    }).join('')}
+    </tbody></table>
+    <details class="explain">
+      <summary>¿Cómo se calculan los ingresos cuando el precio de venta varía?</summary>
+      <p>Al registrar una <strong>salida por venta</strong> puedes ingresar el precio de venta real de esa transacción (descuento, promoción, ajuste). El sistema lo guarda junto con el movimiento y lo usa para calcular ingresos exactos en vez de asumir siempre el precio de lista.</p>
+      <ul>
+        <li><strong>Ingresos del producto</strong> = Σ(cantidad × precio de venta real). Si no se registró precio, se usa el precio de lista como respaldo.</li>
+        <li><strong>Precio promedio</strong> = Ingresos ÷ unidades vendidas. Te muestra a qué precio promedio se movió realmente el producto en el período.</li>
+        <li>Si el precio promedio es muy distinto al precio de lista, aparece una señal (verde si vendiste más caro, amarilla si vendiste más barato) para que detectes descuentos o cambios de estrategia.</li>
+      </ul>
+    </details>
+    <details class="explain">
+      <summary>¿Cómo se calcula el costo cuando los precios de compra cambian?</summary>
+      <p>Cuando compras el mismo producto a diferentes precios, el sistema calcula el <strong>costo unitario efectivo</strong> usando el método de valoración configurado:</p>
+      <ul>
+        <li><strong>Promedio Ponderado (WAC)</strong> — el default, el más usado en Colombia. Fórmula:<br>
+          <code>costo_promedio = Σ(cantidad × costo_unitario) / Σ(cantidad)</code><br>
+          <em>Ejemplo:</em> compraste 40u a $2.400 y luego 30u a $2.500 → costo promedio = ((40×2400) + (30×2500)) / 70 = <strong>$2.443</strong>. Todas las ventas y el valor del inventario usan este promedio.
+        </li>
+        <li><strong>Último costo</strong> — siempre usa el costo de la compra más reciente. Útil para cotizar rápido, menos preciso contablemente.</li>
+        <li><strong>FIFO</strong> — primero en entrar, primero en salir. Las ventas descargan el costo del lote más antiguo. En este prototipo se trata como WAC.</li>
+      </ul>
+      <p>Si un producto no tiene entradas con costo registrado, se usa el <strong>costo de referencia inicial</strong> ingresado al crearlo como respaldo.</p>
+      <p><strong>Cómo actualizar el costo:</strong> al registrar una <strong>Nueva entrada</strong>, ingresa el costo unitario real de esa compra. El sistema recalcula automáticamente el costo promedio del producto.</p>
+    </details>`;
+}
+
+function renderForecastReport(products) {
+  const rows = products.map(p => {
+    const s   = suggestReorder(p);
+    const v   = avgDailyOut(p.id, 30);
+    const cov = daysOfCoverage(p.id, 30);
+    return { p, s, v, cov };
+  });
+  const withSuggestion = rows.filter(r => r.s).sort((a,b) => a.s.daysLeft - b.s.daysLeft);
+  if (withSuggestion.length === 0) return `<div class="empty"><div class="empty-icon">✅</div><strong>Sin urgencias</strong><div>Ningún producto filtrado necesita reposición ahora.</div></div>`;
+  return `<table class="table"><thead><tr>
+    <th>Producto</th>
+    <th class="num">Stock</th>
+    <th class="num">Consumo diario</th>
+    <th class="num">Cobertura</th>
+    <th class="num">Cantidad sugerida</th>
+    <th>Pedir antes del</th>
+    <th>Prioridad</th>
+  </tr></thead><tbody>
+  ${withSuggestion.map(r => {
+    const prio = r.s.daysLeft <= 3 ? { l:'Urgente', c:'badge-danger' } : r.s.daysLeft <= 7 ? { l:'Alta', c:'badge-warn' } : { l:'Media', c:'badge-info' };
+    return `<tr>
+      <td>
+        <div style="font-weight:500">${esc(r.p.name)}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(r.p.sku)}</div>
+      </td>
+      <td class="num">${stockOf(r.p.id)} ${esc(r.p.unit)}</td>
+      <td class="num">${r.s.avgDaily.toFixed(2)}</td>
+      <td class="num">${r.s.daysLeft} días</td>
+      <td class="num"><strong>${r.s.qty}</strong> ${esc(r.p.unit)}</td>
+      <td>${r.s.urgent
+        ? '<span style="color:var(--danger);font-weight:700">🚨 Pedir ya</span>'
+        : r.s.reorderByDate.toLocaleDateString('es')}</td>
+      <td><span class="badge ${prio.c}">${prio.l}</span></td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>`;
+}
+
+function renderInventoryReport(products, movements, stock, currency) {
+  if (products.length === 0) return `<div class="empty"><div class="empty-icon">📦</div><strong>Sin resultados</strong><div>Ajusta los filtros para ver productos.</div></div>`;
+  const movByProduct = {};
+  movements.forEach(m => {
+    if (!movByProduct[m.productId]) movByProduct[m.productId] = { in:0, out:0 };
+    isIncoming(m.type) ? movByProduct[m.productId].in += m.quantity : movByProduct[m.productId].out += m.quantity;
+  });
+  return `<table class="table"><thead><tr>
+    <th>SKU</th><th>Producto</th><th>Categoría</th>
+    <th class="num">Stock</th><th class="num">Mín.</th>
+    <th class="num">Entradas</th><th class="num">Salidas</th>
+    <th class="num" title="Costo promedio ponderado (WAC) calculado sobre todas las compras registradas">Costo prom.</th>
+    <th class="num">Precio</th><th class="num">Margen</th>
+    <th class="num">Valor</th><th>Estado</th>
+  </tr></thead><tbody>
+  ${products.map(p => {
+    const s = stock[p.id] ?? 0;
+    const mov = movByProduct[p.id] || { in:0, out:0 };
+    const below = s < p.minStock;
+    const value = s * (p.price ?? 0);
+    return `<tr>
+      <td><code>${esc(p.sku)}</code></td>
+      <td>${esc(p.name)}</td>
+      <td>${esc(p.category)}</td>
+      <td class="num"><strong>${s}</strong> ${esc(p.unit)}</td>
+      <td class="num">${p.minStock}</td>
+      <td class="num" style="color:var(--success)">+${mov.in}</td>
+      <td class="num" style="color:var(--danger)">−${mov.out}</td>
+      <td class="num">${hasCost(p) ? formatMoney(costOf(p), currency) : '<span class="text-muted">—</span>'}</td>
+      <td class="num">${formatMoney(p.price ?? 0, currency)}</td>
+      <td class="num">${marginBadge(p)}</td>
+      <td class="num"><strong>${formatMoney(value, currency)}</strong></td>
+      <td><span class="badge ${below?'badge-danger':'badge-ok'}">${below?'Bajo mínimo':'OK'}</span></td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>`;
+}
+
+function renderMovementsReport(movements) {
+  if (movements.length === 0) return `<div class="empty"><div class="empty-icon">📜</div><strong>Sin movimientos</strong><div>No hay movimientos que coincidan con los filtros.</div></div>`;
+  const sorted = [...movements].sort((a,b) => b.createdAt.localeCompare(a.createdAt));
+  const currency = store.tenant?.currency || 'COP';
+  return `<table class="table"><thead><tr>
+    <th>Fecha</th><th>Producto</th><th>Tipo</th>
+    <th class="num">Cantidad</th><th class="num">Precio / costo</th><th class="num">Total</th>
+    <th>Motivo</th><th>Referencia</th>
+  </tr></thead><tbody>
+  ${sorted.map(m => {
+    const inc = isIncoming(m.type);
+    const p = store.products.find(pp => pp.id === m.productId);
+    let unit = 0, totalCell = '<span class="text-muted">—</span>', unitCell = '<span class="text-muted">—</span>';
+    if (inc) {
+      unit = Number(m.unitCost) || 0;
+      if (unit > 0) { unitCell = formatMoney(unit, currency); totalCell = formatMoney(unit * m.quantity, currency); }
+    } else {
+      unit = Number(m.unitPrice) || 0;
+      if (unit > 0) { unitCell = formatMoney(unit, currency); totalCell = formatMoney(unit * m.quantity, currency); }
+      else if (p) { unit = priceOf(p); if (unit > 0) { unitCell = `<span class="text-muted">${formatMoney(unit, currency)}</span>`; totalCell = `<span class="text-muted">${formatMoney(unit * m.quantity, currency)}</span>`; } }
+    }
+    return `<tr>
+      <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
+      <td>
+        <div style="font-weight:500">${esc(productName(m.productId))}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(productSku(m.productId))}</div>
+      </td>
+      <td><span class="badge ${inc?'badge-ok':'badge-warn'}">${MOVEMENT_LABELS[m.type]}</span></td>
+      <td class="num" style="color:${inc?'var(--success)':'var(--danger)'};font-weight:600">${inc?'+':'−'}${m.quantity}</td>
+      <td class="num">${unitCell}</td>
+      <td class="num">${totalCell}</td>
+      <td>${esc(m.reason)}</td>
+      <td class="text-muted">${esc(m.reference || '—')}</td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>
+  <div class="text-muted" style="font-size:11px;margin-top:8px">El precio/costo mostrado en gris usa el valor del catálogo cuando no se registró uno específico para ese movimiento.</div>`;
+}
+
+function renderCategoryReport(products, movements, stock, currency) {
+  const by = {};
+  const bucket = c => (by[c] ||= { products:0, units:0, value:0, in:0, out:0 });
+  products.forEach(p => {
+    const r = bucket(p.category || '—');
+    r.products += 1;
+    const s = stock[p.id] ?? 0;
+    r.units += Math.max(0, s);
+    r.value += s * (p.price ?? 0);
+  });
+  movements.forEach(m => {
+    const p = store.products.find(pp => pp.id === m.productId);
+    if (!p) return;
+    const r = bucket(p.category || '—');
+    isIncoming(m.type) ? r.in += m.quantity : r.out += m.quantity;
+  });
+  const rows = Object.entries(by).sort((a,b) => b[1].value - a[1].value);
+  if (rows.length === 0) return `<div class="empty"><div class="empty-icon">🏷️</div><strong>Sin categorías</strong></div>`;
+  return `<table class="table"><thead><tr>
+    <th>Categoría</th>
+    <th class="num">Productos</th>
+    <th class="num">Unidades en stock</th>
+    <th class="num">Entradas</th>
+    <th class="num">Salidas</th>
+    <th class="num">Valor total</th>
+  </tr></thead><tbody>
+  ${rows.map(([c, r]) => `<tr>
+    <td><strong>${esc(c)}</strong></td>
+    <td class="num">${r.products}</td>
+    <td class="num">${r.units}</td>
+    <td class="num" style="color:var(--success)">+${r.in}</td>
+    <td class="num" style="color:var(--danger)">−${r.out}</td>
+    <td class="num"><strong>${formatMoney(r.value, currency)}</strong></td>
+  </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function renderTopProductsReport(products, movements, stock) {
+  const by = {};
+  products.forEach(p => { by[p.id] = { p, in:0, out:0, total:0, stock: stock[p.id] ?? 0 }; });
+  movements.forEach(m => {
+    if (!by[m.productId]) return;
+    isIncoming(m.type) ? by[m.productId].in += m.quantity : by[m.productId].out += m.quantity;
+    by[m.productId].total += m.quantity;
+  });
+  const rows = Object.values(by).sort((a,b) => b.total - a.total).slice(0, 20);
+  if (rows.length === 0 || rows.every(r => r.total === 0)) {
+    return `<div class="empty"><div class="empty-icon">📊</div><strong>Sin movimiento</strong><div>Los productos filtrados no registran movimientos en el período.</div></div>`;
+  }
+  const max = Math.max(...rows.map(r => r.total), 1);
+  return `<table class="table"><thead><tr>
+    <th>#</th><th>Producto</th><th>Categoría</th>
+    <th class="num">Stock</th>
+    <th class="num">Entradas</th><th class="num">Salidas</th>
+    <th class="num">Total movido</th>
+    <th>Participación</th>
+  </tr></thead><tbody>
+  ${rows.map((r, i) => {
+    const pct = Math.round((r.total / max) * 100);
+    return `<tr>
+      <td class="text-muted">${i+1}</td>
+      <td>
+        <div style="font-weight:500">${esc(r.p.name)}</div>
+        <div style="font-size:11px;color:var(--muted)">${esc(r.p.sku)}</div>
+      </td>
+      <td>${esc(r.p.category)}</td>
+      <td class="num">${r.stock} ${esc(r.p.unit)}</td>
+      <td class="num" style="color:var(--success)">+${r.in}</td>
+      <td class="num" style="color:var(--danger)">−${r.out}</td>
+      <td class="num"><strong>${r.total}</strong></td>
+      <td><div class="coverage-bar" style="width:140px"><div class="coverage-fill" style="width:${pct}%;background:var(--primary)"></div></div></td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>`;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c ?? '');
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(';')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function exportReportCsv() {
+  const { filteredProducts, filteredMovements, stock } = computeReportData();
+  let rows, filename;
+
+  if (reportTab === 'movements') {
+    rows = [['Fecha','SKU','Producto','Tipo','Cantidad','Precio/Costo unitario','Total','Motivo','Referencia']];
+    [...filteredMovements].sort((a,b) => b.createdAt.localeCompare(a.createdAt)).forEach(m => {
+      const inc = isIncoming(m.type);
+      const p = store.products.find(pp => pp.id === m.productId);
+      const unit = inc ? (Number(m.unitCost) || 0) : (Number(m.unitPrice) || priceOf(p));
+      const total = unit > 0 ? Math.round(unit * m.quantity) : '';
+      rows.push([m.createdAt, productSku(m.productId), productName(m.productId), MOVEMENT_LABELS[m.type], m.quantity, unit || '', total, m.reason, m.reference || '']);
+    });
+    filename = 'inventra-movimientos.csv';
+  } else if (reportTab === 'by-category') {
+    const by = {};
+    const bucket = c => (by[c] ||= { products:0, units:0, value:0, in:0, out:0 });
+    filteredProducts.forEach(p => {
+      const r = bucket(p.category || '—');
+      r.products += 1;
+      const s = stock[p.id] ?? 0;
+      r.units += Math.max(0, s);
+      r.value += s * (p.price ?? 0);
+    });
+    filteredMovements.forEach(m => {
+      const p = store.products.find(pp => pp.id === m.productId);
+      if (!p) return;
+      const r = bucket(p.category || '—');
+      isIncoming(m.type) ? r.in += m.quantity : r.out += m.quantity;
+    });
+    rows = [['Categoría','Productos','Unidades','Entradas','Salidas','Valor total']];
+    Object.entries(by).sort((a,b) => b[1].value - a[1].value).forEach(([c, r]) => {
+      rows.push([c, r.products, r.units, r.in, r.out, Math.round(r.value)]);
+    });
+    filename = 'inventra-por-categoria.csv';
+  } else if (reportTab === 'top-products') {
+    const by = {};
+    filteredProducts.forEach(p => { by[p.id] = { p, in:0, out:0, total:0, stock: stock[p.id] ?? 0 }; });
+    filteredMovements.forEach(m => {
+      if (!by[m.productId]) return;
+      isIncoming(m.type) ? by[m.productId].in += m.quantity : by[m.productId].out += m.quantity;
+      by[m.productId].total += m.quantity;
+    });
+    rows = [['SKU','Producto','Categoría','Stock','Entradas','Salidas','Total movido']];
+    Object.values(by).sort((a,b) => b.total - a.total).forEach(r => {
+      rows.push([r.p.sku, r.p.name, r.p.category, r.stock, r.in, r.out, r.total]);
+    });
+    filename = 'inventra-top-productos.csv';
+  } else if (reportTab === 'profitability') {
+    const byProduct = {};
+    filteredMovements.forEach(m => {
+      if (isIncoming(m.type)) return;
+      const b = byProduct[m.productId] ||= { qty:0, revenue:0 };
+      b.qty += m.quantity;
+      b.revenue += movementRevenue(m);
+    });
+    rows = [['SKU','Producto','Categoría','Unidades vendidas','Precio promedio','Ingresos','COGS','Utilidad','Margen %','Observación']];
+    filteredProducts.forEach(p => {
+      const b = byProduct[p.id] || { qty:0, revenue:0 };
+      const qty = b.qty;
+      const revenue = b.revenue;
+      const avgPrice = qty > 0 ? Math.round(revenue / qty) : '';
+      const withCost = hasCost(p);
+      const cogs    = withCost ? qty * costOf(p) : '';
+      const profit  = withCost ? Math.round(revenue - qty * costOf(p)) : '';
+      const margen  = withCost && revenue > 0 ? ((revenue - qty * costOf(p)) / revenue * 100).toFixed(1) : '';
+      const note    = withCost ? '' : 'Falta costo';
+      rows.push([p.sku, p.name, p.category, qty, avgPrice, Math.round(revenue), withCost ? Math.round(cogs) : '', profit, margen, note]);
+    });
+    filename = 'inventra-rentabilidad.csv';
+  } else if (reportTab === 'forecast') {
+    rows = [['SKU','Producto','Stock','Consumo diario','Días restantes','Cantidad sugerida','Pedir antes del']];
+    filteredProducts.map(p => ({ p, s:suggestReorder(p) })).filter(x => x.s)
+      .sort((a,b) => a.s.daysLeft - b.s.daysLeft).forEach(x => {
+      rows.push([x.p.sku, x.p.name, stockOf(x.p.id), x.s.avgDaily.toFixed(2), x.s.daysLeft, x.s.qty, x.s.urgent ? 'PEDIR YA' : x.s.reorderByDate.toLocaleDateString('es')]);
+    });
+    filename = 'inventra-pronostico.csv';
+  } else {
+    const movByProduct = {};
+    filteredMovements.forEach(m => {
+      if (!movByProduct[m.productId]) movByProduct[m.productId] = { in:0, out:0 };
+      isIncoming(m.type) ? movByProduct[m.productId].in += m.quantity : movByProduct[m.productId].out += m.quantity;
+    });
+    rows = [['SKU','Producto','Categoría','Unidad','Stock','Mínimo','Entradas','Salidas','Precio','Valor']];
+    filteredProducts.forEach(p => {
+      const s = stock[p.id] ?? 0;
+      const mov = movByProduct[p.id] || { in:0, out:0 };
+      rows.push([p.sku, p.name, p.category, p.unit, s, p.minStock, mov.in, mov.out, p.price ?? 0, Math.round(s * (p.price ?? 0))]);
+    });
+    filename = 'inventra-inventario.csv';
+  }
+  downloadCsv(filename, rows);
+  toast('Reporte exportado.', 'success');
+}
+
+// ----- Onboarding view (single-page consolidated form)
+function viewOnboarding() {
+  const d = onboardingState.data;
+  const selectedV = d.vertical;
+  const isOther = selectedV === 'other';
+  if (selectedV) ensureLists();
+  const list = d.initialProducts || [];
+  const catOpts  = (d.categoriesList || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  const unitOpts = (d.unitsList || []).map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+  const totalUnits = list.reduce((a, p) => a + (Number(p.currentStock) || 0), 0);
+
+  return `
+    <div class="onboarding-layout">
+      <div class="onb-header">
+        <div class="onb-logo">📦</div>
+        <div>
+          <div class="onb-brand">Inventra AI</div>
+          <div class="onb-tagline">Configuración inicial</div>
+        </div>
+      </div>
+      <div class="onb-container" style="align-items:flex-start;padding:24px 24px 60px">
+        <div class="onb-card" style="max-width:980px">
+          <div style="padding:24px 32px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+            <div>
+              <h1 style="margin:0 0 4px;font-size:22px">Bienvenido a Inventra AI</h1>
+              <div class="text-muted">Registra tu empresa en un solo formulario y empieza a operar.</div>
+            </div>
+            <button type="button" class="btn btn-sm" onclick="restoreDemo()" title="Volver a la empresa demo de muestra">↺ Usar demo de muestra</button>
+          </div>
+
+          <form id="onb-main-form" onsubmit="submitOneShot(event)">
+            <div style="padding:24px 32px">
+
+              <section>
+                <h3 style="margin-top:0">🏢 Datos de la empresa</h3>
+                <div class="form-grid">
+                  <div class="field">
+                    <label class="required">Nombre del negocio</label>
+                    <input name="companyName" required value="${esc(d.companyName || '')}" placeholder="Ej: Distribuidora La Esquina"/>
+                  </div>
+                  <div class="field">
+                    <label class="required">NIT / RUC / Tax ID</label>
+                    <input name="taxId" required value="${esc(d.taxId || '')}" placeholder="Ej: 900.123.456-7"/>
+                  </div>
+                  <div class="field">
+                    <label>Email de contacto</label>
+                    <input type="email" name="contactEmail" value="${esc(d.contactEmail || '')}" placeholder="contacto@empresa.com"/>
+                  </div>
+                  <div class="field">
+                    <label>Teléfono</label>
+                    <input name="contactPhone" value="${esc(d.contactPhone || '')}" placeholder="+57 300 123 4567"/>
+                  </div>
+                  <div class="field">
+                    <label class="required">Moneda</label>
+                    <select name="currency" required>
+                      ${CURRENCIES.map(c => `<option ${(d.currency||'COP')===c?'selected':''}>${c}</option>`).join('')}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="required">Zona horaria</label>
+                    <select name="timezone" required>
+                      ${TIMEZONES.map(t => `<option ${(d.timezone||'America/Bogota')===t?'selected':''} value="${t}">${t}</option>`).join('')}
+                    </select>
+                  </div>
+                </div>
+              </section>
+
+              <section style="margin-top:28px">
+                <h3>🏷️ Tipo de negocio</h3>
+                <div class="vertical-grid">
+                  ${VERTICALS.map(v => `
+                    <div class="vertical-card ${selectedV === v.code ? 'selected' : ''}" onclick="selectVertical('${v.code}')">
+                      <div class="vertical-icon">${v.icon}</div>
+                      <div class="vertical-name">${v.name}</div>
+                      <div class="text-muted" style="font-size:11px;margin-top:4px">${v.desc}</div>
+                    </div>`).join('')}
+                </div>
+                <input type="hidden" name="vertical" value="${esc(selectedV || '')}" required/>
+                ${isOther ? `
+                  <div class="field" style="margin-top:12px;background:var(--primary-soft);padding:12px;border-radius:8px">
+                    <label class="required">Describe tu negocio</label>
+                    <input id="custom-vertical-name" required value="${esc(d.customVerticalName || '')}"
+                           placeholder="Ej: Accesorios para celulares, Papelería, Tienda de ropa…"
+                           oninput="onboardingState.data.customVerticalName = this.value"/>
+                  </div>` : ''}
+              </section>
+
+              <section style="margin-top:28px">
+                <h3>👤 Usuario administrador</h3>
+                <div class="form-grid">
+                  <div class="field">
+                    <label class="required">Nombre completo</label>
+                    <input name="adminName" required value="${esc(d.adminName || '')}" placeholder="Ej: Natalia Londoño"/>
+                  </div>
+                  <div class="field">
+                    <label class="required">Email</label>
+                    <input type="email" name="adminEmail" required value="${esc(d.adminEmail || '')}" placeholder="tu@email.com"/>
+                  </div>
+                  <div class="field">
+                    <label class="required">Contraseña</label>
+                    <input type="password" name="adminPassword" required minlength="6" value="${esc(d.adminPassword || '')}" placeholder="Mín. 6 caracteres"/>
+                  </div>
+                </div>
+              </section>
+
+              <section style="margin-top:28px">
+                <h3>📍 Sucursal y preferencias</h3>
+                <div class="form-grid">
+                  <div class="field">
+                    <label class="required">Sucursal</label>
+                    <input name="branchName" required value="${esc(d.branchName || 'Principal')}"/>
+                  </div>
+                  <div class="field">
+                    <label>Dirección</label>
+                    <input name="branchAddress" value="${esc(d.branchAddress || '')}" placeholder="Ej: Calle 10 #5-20"/>
+                  </div>
+                  <div class="field">
+                    <label class="required">Bodega</label>
+                    <input name="warehouseName" required value="${esc(d.warehouseName || 'Bodega Central')}"/>
+                  </div>
+                  <div class="field">
+                    <label class="required">Valorización</label>
+                    <select name="valuationMethod" required>
+                      <option value="avg"  ${(d.valuationMethod||'avg')==='avg'?'selected':''}>Promedio ponderado</option>
+                      <option value="fifo" ${d.valuationMethod==='fifo'?'selected':''}>FIFO</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label class="required">¿Permitir stock negativo?</label>
+                    <select name="allowNegative" required>
+                      <option value="no"  ${(d.allowNegative||'no')==='no'?'selected':''}>No (recomendado)</option>
+                      <option value="yes" ${d.allowNegative==='yes'?'selected':''}>Sí (preventa)</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Umbral ajustes (${esc(d.currency || 'COP')})</label>
+                    <input type="number" name="adjustThreshold" min="0" step="50" value="${d.adjustThreshold ?? 500}"/>
+                  </div>
+                </div>
+              </section>
+
+              <section style="margin-top:28px">
+                <div class="row-between">
+                  <h3 style="margin:0">📦 Catálogo inicial ${!selectedV ? '<span class="text-muted" style="font-size:12px;font-weight:400">(elige un tipo de negocio arriba)</span>' : ''}</h3>
+                  ${selectedV ? `<span class="text-muted" style="font-size:12px">${list.length} producto(s) · ${totalUnits} unidades en stock · ${(d.categoriesList||[]).length} categoría(s)</span>` : ''}
+                </div>
+
+                ${!selectedV ? '' : `
+                <div style="border:1px solid var(--border);border-radius:8px;overflow:auto;max-height:260px;margin-top:8px">
+                  ${list.length === 0
+                    ? `<div class="empty" style="padding:20px"><div class="empty-icon">📦</div><strong>Sin productos aún</strong><div class="text-muted">Agrega el primero abajo.</div></div>`
+                    : `<table class="table">
+                        <thead><tr>
+                          <th>SKU</th><th>Nombre</th><th>Categoría</th><th>Unidad</th>
+                          <th class="num">Mín.</th><th class="num">Stock actual</th><th class="num">Precio venta unit.</th><th></th>
+                        </tr></thead>
+                        <tbody>
+                        ${list.map((p, i) => `
+                          <tr>
+                            <td><code>${esc(p.sku)}</code></td>
+                            <td style="font-weight:500">${esc(p.name)}</td>
+                            <td>${esc(p.category)}</td>
+                            <td>${esc(p.unit)}</td>
+                            <td class="num">${p.minStock}</td>
+                            <td class="num">
+                              <input type="number" min="0" step="1" value="${p.currentStock ?? 0}"
+                                     style="width:72px;text-align:right;padding:4px 6px;font-size:13px"
+                                     onchange="editCatalogStock(${i}, this.value)"/>
+                            </td>
+                            <td class="num">${Number(p.price || 0).toFixed(2)}</td>
+                            <td><button type="button" class="btn btn-sm" onclick="removeCatalogRow(${i})">✕</button></td>
+                          </tr>`).join('')}
+                        </tbody></table>`}
+                </div>
+
+                <div style="background:var(--surface-2);border-radius:8px;padding:14px;margin-top:12px">
+                  <div style="font-weight:500;margin-bottom:10px;font-size:13px">➕ Agregar producto al catálogo</div>
+                  <div class="form-grid">
+                    <div class="field"><label>SKU</label><input id="cf-sku" placeholder="${esc(suggestSku(selectedV, list.length + 1))}"/></div>
+                    <div class="field"><label>Nombre</label><input id="cf-name" placeholder="${esc(suggestName(selectedV))}"/></div>
+                    <div class="field">
+                      <label>Categoría</label>
+                      <select id="cf-category" data-role="category" onchange="onCategoryPick(this)">
+                        <option value="">Selecciona…</option>
+                        ${catOpts}
+                        <option value="__NEW__">➕ Agregar nueva categoría…</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label>Unidad</label>
+                      <select id="cf-unit" data-role="unit" onchange="onUnitPick(this)">
+                        <option value="">Selecciona…</option>
+                        ${unitOpts}
+                        <option value="__NEW__">➕ Agregar nueva unidad…</option>
+                      </select>
+                    </div>
+                    <div class="field"><label>Stock mínimo</label><input id="cf-min" type="number" min="0" step="1" value="5"/></div>
+                    <div class="field"><label>Stock actual</label><input id="cf-cur" type="number" min="0" step="1" value="0"/></div>
+                    <div class="field"><label>Costo unitario (${esc(d.currency || 'COP')})</label><input id="cf-cost" type="number" min="0" step="0.01" value="0" placeholder="Lo que te cuesta 1 unidad"/></div>
+                    <div class="field"><label>Precio de venta unitario (${esc(d.currency || 'COP')})</label><input id="cf-price" type="number" min="0" step="0.01" value="0" placeholder="Precio al que vendes 1 unidad"/></div>
+                  </div>
+                  <div class="row mt-12" style="justify-content:flex-end">
+                    <button type="button" class="btn btn-primary btn-sm" onclick="addCatalogFromFields()">+ Agregar al catálogo</button>
+                  </div>
+                </div>
+                `}
+              </section>
+
+            </div>
+
+            <div class="onb-footer">
+              <span class="text-muted" style="font-size:12px">Puedes modificar todo después desde el sistema.</span>
+              <button type="submit" class="btn btn-primary">✓ Crear empresa</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>`;
+}
+
+// --- Legacy multi-step helpers kept as dead code for safety ---
+function __viewOnboardingLegacy() {
+  const step = onboardingState.step;
+  const total = 6;
+  const d = onboardingState.data;
+
+  let body = '';
+  if (step === 0) {
+    body = `
+      <div class="welcome-hero">
+        <div class="welcome-icon">📦</div>
+        <h1 class="welcome-title">Bienvenido a Inventra AI</h1>
+        <p class="text-muted">Sistema de inventario adaptable a tu negocio. Configúralo en menos de 2 minutos.</p>
+      </div>
+      <div class="welcome-features">
+        <div class="feature-item"><span class="feature-check">✓</span><div><strong>Control total</strong><div class="text-muted" style="font-size:12px">Stock en tiempo real con trazabilidad completa</div></div></div>
+        <div class="feature-item"><span class="feature-check">✓</span><div><strong>Alertas automáticas</strong><div class="text-muted" style="font-size:12px">Avisos de stock bajo y productos críticos</div></div></div>
+        <div class="feature-item"><span class="feature-check">✓</span><div><strong>Adaptable</strong><div class="text-muted" style="font-size:12px">Tienda, repostería, farmacia, ferretería y más</div></div></div>
+        <div class="feature-item"><span class="feature-check">✓</span><div><strong>Fácil de usar</strong><div class="text-muted" style="font-size:12px">Diseñado para operación rápida</div></div></div>
+      </div>`;
+  } else if (step === 1) {
+    body = `
+      <div class="onb-eyebrow">Paso 1 de ${total}</div>
+      <h2 class="onb-title">Datos de tu empresa</h2>
+      <p class="onb-subtitle">Información básica para identificar tu negocio.</p>
+      <form id="onb-form" onsubmit="submitOnbStep(event)">
+        <div class="form-grid">
+          <div class="field">
+            <label class="required">Nombre del negocio</label>
+            <input name="companyName" required value="${esc(d.companyName || '')}" placeholder="Ej: Distribuidora La Esquina"/>
+          </div>
+          <div class="field">
+            <label class="required">NIT / RUC / Tax ID</label>
+            <input name="taxId" required value="${esc(d.taxId || '')}" placeholder="Ej: 900.123.456-7"/>
+          </div>
+          <div class="field">
+            <label>Email de contacto</label>
+            <input type="email" name="contactEmail" value="${esc(d.contactEmail || '')}" placeholder="contacto@empresa.com"/>
+          </div>
+          <div class="field">
+            <label>Teléfono</label>
+            <input name="contactPhone" value="${esc(d.contactPhone || '')}" placeholder="Ej: +57 300 123 4567"/>
+          </div>
+          <div class="field">
+            <label class="required">Moneda</label>
+            <select name="currency" required>
+              ${CURRENCIES.map(c => `<option ${(d.currency||'COP')===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label class="required">Zona horaria</label>
+            <select name="timezone" required>
+              ${TIMEZONES.map(t => `<option ${(d.timezone||'America/Bogota')===t?'selected':''} value="${t}">${t}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </form>`;
+  } else if (step === 2) {
+    const isOther = d.vertical === 'other';
+    body = `
+      <div class="onb-eyebrow">Paso 2 de ${total}</div>
+      <h2 class="onb-title">¿Qué tipo de negocio tienes?</h2>
+      <p class="onb-subtitle">Elige el que más se parezca o selecciona "Otro" para describirlo tú.</p>
+      <div class="vertical-grid">
+        ${VERTICALS.map(v => `
+          <div class="vertical-card ${d.vertical === v.code ? 'selected' : ''}" onclick="selectVertical('${v.code}')">
+            <div class="vertical-icon">${v.icon}</div>
+            <div class="vertical-name">${v.name}</div>
+            <div class="text-muted" style="font-size:11px;margin-top:4px">${v.desc}</div>
+          </div>`).join('')}
+      </div>
+      ${isOther ? `
+        <div class="card" style="margin-top:16px;background:var(--primary-soft);border-color:var(--primary)">
+          <div class="field" style="gap:8px">
+            <label class="required">Describe tu negocio</label>
+            <input id="custom-vertical-name" required value="${esc(d.customVerticalName || '')}"
+                   placeholder="Ej: Accesorios para celulares, Papelería, Tienda de ropa…"
+                   oninput="onboardingState.data.customVerticalName = this.value"/>
+            <div class="hint">En el siguiente paso construiremos tu catálogo desde cero con los productos que vendes.</div>
+          </div>
+        </div>` : ''}`;
+  } else if (step === 3) {
+    // Catálogo inicial (editable para todos; vacío y abierto para "Otro")
+    if (!d.initialProducts) {
+      d.initialProducts = defaultCategoriesFor(d.vertical).map(p => ({ ...p }));
+    }
+    ensureLists();
+    const list = d.initialProducts;
+    const vLabel = d.vertical === 'other'
+      ? (d.customVerticalName || 'tu negocio')
+      : (VERTICALS.find(v => v.code === d.vertical)?.name || 'tu negocio');
+    const emptyHint = d.vertical === 'other'
+      ? `Empieza agregando los productos que vendes. Puedes crear, editar o eliminar más desde la pantalla <strong>Productos</strong> después.`
+      : `Sugerimos un catálogo inicial para <strong>${esc(vLabel)}</strong>. Puedes quitar los que no uses y agregar los tuyos.`;
+    const catOpts = (d.categoriesList || []).map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    const unitOpts = (d.unitsList || []).map(u => `<option value="${esc(u)}">${esc(u)}</option>`).join('');
+
+    body = `
+      <div class="onb-eyebrow">Paso 3 de ${total}</div>
+      <h2 class="onb-title">Catálogo inicial</h2>
+      <p class="onb-subtitle">${emptyHint}</p>
+
+      <div class="card" style="padding:0">
+        ${list.length === 0
+          ? `<div class="empty" style="padding:28px 20px"><div class="empty-icon">📦</div><strong>Sin productos aún</strong><div class="text-muted">Agrega tu primer producto abajo.</div></div>`
+          : `<table class="table">
+              <thead><tr>
+                <th>SKU</th><th>Nombre</th><th>Categoría</th><th>Unidad</th>
+                <th class="num">Stock mín.</th><th class="num">Stock actual</th><th class="num">Precio venta</th><th></th>
+              </tr></thead>
+              <tbody>
+              ${list.map((p, i) => `
+                <tr>
+                  <td><code>${esc(p.sku)}</code></td>
+                  <td style="font-weight:500">${esc(p.name)}</td>
+                  <td>${esc(p.category)}</td>
+                  <td>${esc(p.unit)}</td>
+                  <td class="num">${p.minStock}</td>
+                  <td class="num">
+                    <input type="number" min="0" step="1" value="${p.currentStock ?? 0}"
+                           style="width:80px;text-align:right;padding:4px 6px;font-size:13px"
+                           onchange="editCatalogStock(${i}, this.value)"/>
+                  </td>
+                  <td class="num">${Number(p.price || 0).toFixed(2)}</td>
+                  <td><button type="button" class="btn btn-sm" onclick="removeCatalogRow(${i})">✕</button></td>
+                </tr>`).join('')}
+              </tbody></table>`}
+      </div>
+
+      <div class="card mt-16">
+        <h3 style="margin-top:0">Agregar producto</h3>
+        <form id="catalog-form" onsubmit="addCatalogRow(event)">
+          <div class="form-grid">
+            <div class="field">
+              <label class="required">SKU</label>
+              <input name="sku" required placeholder="${esc(suggestSku(d.vertical, list.length + 1))}"/>
+            </div>
+            <div class="field">
+              <label class="required">Nombre</label>
+              <input name="name" required placeholder="${esc(suggestName(d.vertical))}"/>
+            </div>
+            <div class="field">
+              <label class="required">Categoría</label>
+              <select name="category" data-role="category" required onchange="onCategoryPick(this)">
+                <option value="">Selecciona…</option>
+                ${catOpts}
+                <option value="__NEW__">➕ Agregar nueva categoría…</option>
+              </select>
+              <div class="hint">¿Falta alguna? Elige "➕ Agregar nueva categoría…"</div>
+            </div>
+            <div class="field">
+              <label class="required">Unidad</label>
+              <select name="unit" data-role="unit" required onchange="onUnitPick(this)">
+                <option value="">Selecciona…</option>
+                ${unitOpts}
+                <option value="__NEW__">➕ Agregar nueva unidad…</option>
+              </select>
+              <div class="hint">Puedes agregar unidades personalizadas.</div>
+            </div>
+            <div class="field">
+              <label class="required">Stock mínimo</label>
+              <input name="minStock" type="number" min="0" step="1" required value="5"/>
+              <div class="hint">Mínimo para disparar alerta.</div>
+            </div>
+            <div class="field">
+              <label>Stock actual</label>
+              <input name="currentStock" type="number" min="0" step="1" value="0"/>
+              <div class="hint">Unidades que tienes hoy. Se registra como "Saldo inicial".</div>
+            </div>
+            <div class="field">
+              <label>Precio de venta unitario (${esc(d.currency || 'COP')})</label>
+              <input name="price" type="number" min="0" step="0.01" value="0"/>
+              <div class="hint">Lo que cobras por 1 unidad al cliente.</div>
+            </div>
+          </div>
+          <div class="row mt-12" style="justify-content:flex-end">
+            <button type="submit" class="btn btn-primary">+ Agregar al catálogo</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="text-muted mt-12" style="font-size:12px;text-align:center">
+        <strong>${list.length}</strong> producto(s) · <strong>${(d.categoriesList || []).length}</strong> categoría(s) · <strong>${(d.unitsList || []).length}</strong> unidad(es) disponibles
+        ${list.length === 0 ? ' · puedes continuar sin productos y agregarlos después' : ''}
+      </div>`;
+  } else if (step === 4) {
+    body = `
+      <div class="onb-eyebrow">Paso 4 de ${total}</div>
+      <h2 class="onb-title">Usuario administrador</h2>
+      <p class="onb-subtitle">El primer usuario con acceso total al sistema.</p>
+      <form id="onb-form" onsubmit="submitOnbStep(event)">
+        <div class="form-grid">
+          <div class="field">
+            <label class="required">Nombre completo</label>
+            <input name="adminName" required value="${esc(d.adminName || '')}" placeholder="Ej: Natalia Londoño"/>
+          </div>
+          <div class="field">
+            <label class="required">Email</label>
+            <input type="email" name="adminEmail" required value="${esc(d.adminEmail || '')}" placeholder="tu@email.com"/>
+          </div>
+          <div class="field">
+            <label class="required">Contraseña</label>
+            <input type="password" name="adminPassword" required minlength="6" value="${esc(d.adminPassword || '')}" placeholder="Mínimo 6 caracteres"/>
+            <div class="hint">En el sistema real se almacenaría con hashing seguro.</div>
+          </div>
+        </div>
+      </form>`;
+  } else if (step === 5) {
+    body = `
+      <div class="onb-eyebrow">Paso 5 de ${total}</div>
+      <h2 class="onb-title">Primera sucursal y bodega</h2>
+      <p class="onb-subtitle">Más adelante podrás agregar más ubicaciones.</p>
+      <form id="onb-form" onsubmit="submitOnbStep(event)">
+        <div class="form-grid">
+          <div class="field">
+            <label class="required">Nombre de la sucursal</label>
+            <input name="branchName" required value="${esc(d.branchName || 'Principal')}"/>
+          </div>
+          <div class="field">
+            <label>Dirección</label>
+            <input name="branchAddress" value="${esc(d.branchAddress || '')}" placeholder="Ej: Calle 10 #5-20"/>
+          </div>
+          <div class="field">
+            <label class="required">Nombre de la bodega</label>
+            <input name="warehouseName" required value="${esc(d.warehouseName || 'Bodega Central')}"/>
+          </div>
+          <div class="field">
+            <label class="required">Método de valorización</label>
+            <select name="valuationMethod" required>
+              <option value="avg"  ${(d.valuationMethod||'avg')==='avg'?'selected':''}>Promedio ponderado</option>
+              <option value="fifo" ${d.valuationMethod==='fifo'?'selected':''}>FIFO (primero en entrar, primero en salir)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="required">¿Permitir stock negativo?</label>
+            <select name="allowNegative" required>
+              <option value="no"  ${(d.allowNegative||'no')==='no'?'selected':''}>No (recomendado)</option>
+              <option value="yes" ${d.allowNegative==='yes'?'selected':''}>Sí (preventa)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Umbral de aprobación de ajustes</label>
+            <input type="number" name="adjustThreshold" min="0" step="50" value="${d.adjustThreshold ?? 500}"/>
+            <div class="hint">Ajustes cuyo impacto supere este valor requerirán aprobación.</div>
+          </div>
+        </div>
+      </form>`;
+  } else if (step === 6) {
+    const v = VERTICALS.find(x => x.code === d.vertical);
+    const vName = d.vertical === 'other' ? (d.customVerticalName || 'Otro') : (v?.name || '');
+    const catalogCount = (d.initialProducts || []).length;
+    body = `
+      <div class="onb-eyebrow">Paso 6 de ${total}</div>
+      <h2 class="onb-title">Confirma tu configuración</h2>
+      <p class="onb-subtitle">Revisa los datos antes de crear tu espacio de trabajo.</p>
+      <div class="summary-section">
+        <div class="summary-section-title">Empresa</div>
+        <div class="summary-row"><span class="summary-label">Nombre</span><span class="summary-value">${esc(d.companyName)}</span></div>
+        <div class="summary-row"><span class="summary-label">Tipo de negocio</span><span class="summary-value">${v?.icon} ${esc(vName)}</span></div>
+        <div class="summary-row"><span class="summary-label">NIT / Tax ID</span><span class="summary-value">${esc(d.taxId)}</span></div>
+        <div class="summary-row"><span class="summary-label">Moneda · Zona</span><span class="summary-value">${esc(d.currency)} · ${esc(d.timezone)}</span></div>
+      </div>
+      <div class="summary-section">
+        <div class="summary-section-title">Catálogo inicial</div>
+        <div class="summary-row">
+          <span class="summary-label">Productos a cargar</span>
+          <span class="summary-value">${catalogCount} ${catalogCount === 1 ? 'producto' : 'productos'}</span>
+        </div>
+        <div class="summary-row">
+          <span class="summary-label">Unidades totales en stock</span>
+          <span class="summary-value">${(d.initialProducts || []).reduce((a, p) => a + (Number(p.currentStock) || 0), 0)}</span>
+        </div>
+        ${catalogCount > 0 ? `
+          <div class="text-muted" style="font-size:12px;margin-top:6px">
+            ${(d.initialProducts).slice(0, 5).map(p => esc(p.name)).join(' · ')}${catalogCount > 5 ? ` … y ${catalogCount - 5} más` : ''}
+          </div>` : ''}
+      </div>
+      <div class="summary-section">
+        <div class="summary-section-title">Administrador</div>
+        <div class="summary-row"><span class="summary-label">Nombre</span><span class="summary-value">${esc(d.adminName)}</span></div>
+        <div class="summary-row"><span class="summary-label">Email</span><span class="summary-value">${esc(d.adminEmail)}</span></div>
+      </div>
+      <div class="summary-section">
+        <div class="summary-section-title">Operación</div>
+        <div class="summary-row"><span class="summary-label">Sucursal</span><span class="summary-value">${esc(d.branchName)}</span></div>
+        <div class="summary-row"><span class="summary-label">Bodega</span><span class="summary-value">${esc(d.warehouseName)}</span></div>
+        <div class="summary-row"><span class="summary-label">Valorización</span><span class="summary-value">${d.valuationMethod === 'fifo' ? 'FIFO' : 'Promedio ponderado'}</span></div>
+        <div class="summary-row"><span class="summary-label">Stock negativo</span><span class="summary-value">${d.allowNegative === 'yes' ? 'Permitido' : 'Bloqueado'}</span></div>
+        <div class="summary-row"><span class="summary-label">Umbral de ajustes</span><span class="summary-value">${d.adjustThreshold || 500} ${esc(d.currency)}</span></div>
+      </div>
+    `;
+  }
+
+  const showFooter = step > 0;
+  const progress = Array.from({ length: total }, (_, i) => {
+    const n = i + 1;
+    const cls = n < step ? 'done' : (n === step ? 'current' : '');
+    return `<div class="onb-step ${cls}"></div>`;
+  }).join('');
+
+  return `
+    <div class="onboarding-layout">
+      <div class="onb-header">
+        <div class="onb-logo">📦</div>
+        <div>
+          <div class="onb-brand">Inventra AI</div>
+          <div class="onb-tagline">Configuración inicial</div>
+        </div>
+      </div>
+      <div class="onb-container">
+        <div class="onb-card">
+          ${step > 0 ? `<div class="onb-progress">${progress}</div>` : ''}
+          <div class="onb-body">${body}</div>
+          <div class="onb-footer">
+            ${step === 0
+              ? `<span class="onb-step-label">Comencemos</span><button class="btn btn-primary" onclick="nextOnb()">Empezar configuración →</button>`
+              : `<button class="btn" onclick="prevOnb()">← Atrás</button>
+                 <span class="onb-step-label">Paso ${step} de ${total}</span>
+                 ${step === 6
+                   ? `<button class="btn btn-primary" onclick="finishOnboarding()">✓ Crear empresa</button>`
+                   : `<button class="btn btn-primary" onclick="nextOnb()">Continuar →</button>`}`}
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function selectVertical(code) {
+  const prev = onboardingState.data.vertical;
+  onboardingState.data.vertical = code;
+  // If the vertical changed, reset the seed catalog and the category/unit lists
+  if (prev !== code) {
+    onboardingState.data.initialProducts = defaultCategoriesFor(code).map(p => ({ ...p }));
+    onboardingState.data.categoriesList  = [...defaultCategoriesListFor(code)];
+    onboardingState.data.unitsList       = [...defaultUnitsListFor(code)];
+    if (code !== 'other') onboardingState.data.customVerticalName = '';
+  }
+  render();
+}
+
+function ensureLists() {
+  const d = onboardingState.data;
+  if (!d.categoriesList) d.categoriesList = [...defaultCategoriesListFor(d.vertical)];
+  if (!d.unitsList)      d.unitsList      = [...defaultUnitsListFor(d.vertical)];
+}
+
+function onCategoryPick(sel) {
+  if (sel.value !== '__NEW__') return;
+  const name = prompt('Nombre de la nueva categoría:');
+  const clean = (name || '').trim();
+  if (!clean) { sel.value = ''; return; }
+  const list = onboardingState.data.categoriesList;
+  if (!list.some(c => c.toLowerCase() === clean.toLowerCase())) list.push(clean);
+  // Add option to this select and to any other category selects, then select it here
+  const addOpt = (s) => {
+    if (s.querySelector(`option[value="${CSS.escape(clean)}"]`)) return;
+    const opt = document.createElement('option');
+    opt.value = clean; opt.textContent = clean;
+    s.insertBefore(opt, s.querySelector('option[value="__NEW__"]'));
+  };
+  document.querySelectorAll('select[data-role="category"]').forEach(addOpt);
+  sel.value = clean;
+  toast(`Categoría "${clean}" agregada.`, 'success');
+}
+
+function onUnitPick(sel) {
+  if (sel.value !== '__NEW__') return;
+  const name = prompt('Nombre de la nueva unidad de medida:');
+  const clean = (name || '').trim();
+  if (!clean) { sel.value = ''; return; }
+  const list = onboardingState.data.unitsList;
+  if (!list.some(u => u.toLowerCase() === clean.toLowerCase())) list.push(clean);
+  const addOpt = (s) => {
+    if (s.querySelector(`option[value="${CSS.escape(clean)}"]`)) return;
+    const opt = document.createElement('option');
+    opt.value = clean; opt.textContent = clean;
+    s.insertBefore(opt, s.querySelector('option[value="__NEW__"]'));
+  };
+  document.querySelectorAll('select[data-role="unit"]').forEach(addOpt);
+  sel.value = clean;
+  toast(`Unidad "${clean}" agregada.`, 'success');
+}
+
+function submitOnbStep(e) { e?.preventDefault(); nextOnb(); }
+
+function nextOnb() {
+  const step = onboardingState.step;
+  if (step === 0) { onboardingState.step = 1; render(); return; }
+  if (step === 2) {
+    if (!onboardingState.data.vertical) { toast('Selecciona un tipo de negocio.', 'error'); return; }
+    if (onboardingState.data.vertical === 'other') {
+      const name = (document.getElementById('custom-vertical-name')?.value || '').trim();
+      if (!name) { toast('Describe tu tipo de negocio.', 'error'); return; }
+      onboardingState.data.customVerticalName = name;
+    }
+    // Ensure catalog seeds are ready for step 3
+    if (!onboardingState.data.initialProducts) {
+      onboardingState.data.initialProducts = defaultCategoriesFor(onboardingState.data.vertical).map(p => ({ ...p }));
+    }
+    onboardingState.step = 3; render(); return;
+  }
+  if (step === 3) {
+    // Catalog step — no required form; can continue even if empty
+    onboardingState.step = 4; render(); return;
+  }
+  // steps 1, 4, 5 have forms
+  const form = document.getElementById('onb-form');
+  if (form) {
+    if (!form.reportValidity()) return;
+    const fd = new FormData(form);
+    for (const [k, v] of fd.entries()) onboardingState.data[k] = v;
+  }
+  if (step < 6) { onboardingState.step += 1; render(); }
+}
+function prevOnb() {
+  if (onboardingState.step > 0) { onboardingState.step -= 1; render(); }
+}
+
+// ----- Catalog helpers (onboarding step 3) -----
+function addCatalogRow(e) {
+  e.preventDefault();
+  const f = e.target;
+  const sku = f.sku.value.trim();
+  const name = f.name.value.trim();
+  const list = onboardingState.data.initialProducts || (onboardingState.data.initialProducts = []);
+  if (list.some(p => p.sku.toLowerCase() === sku.toLowerCase())) {
+    toast(`Ya hay un producto con SKU "${sku}".`, 'error'); return;
+  }
+  list.push({
+    sku, name,
+    category: f.category.value.trim(),
+    unit: f.unit.value.trim(),
+    minStock: Number(f.minStock.value) || 0,
+    currentStock: Number(f.currentStock?.value || 0),
+    price: Number(f.price.value) || 0,
+  });
+  toast(`"${name}" agregado al catálogo.`, 'success');
+  render();
+}
+function removeCatalogRow(index) {
+  const list = onboardingState.data.initialProducts || [];
+  list.splice(index, 1);
+  render();
+}
+function editCatalogStock(index, value) {
+  const list = onboardingState.data.initialProducts;
+  if (list && list[index]) list[index].currentStock = Math.max(0, Number(value) || 0);
+}
+
+// --- Single-page onboarding helpers ---
+function addCatalogFromFields() {
+  const sku = (document.getElementById('cf-sku')?.value || '').trim();
+  const name = (document.getElementById('cf-name')?.value || '').trim();
+  const category = (document.getElementById('cf-category')?.value || '').trim();
+  const unit = (document.getElementById('cf-unit')?.value || '').trim();
+  const minStock = Number(document.getElementById('cf-min')?.value || 0);
+  const currentStock = Number(document.getElementById('cf-cur')?.value || 0);
+  const cost = Number(document.getElementById('cf-cost')?.value || 0);
+  const price = Number(document.getElementById('cf-price')?.value || 0);
+
+  if (!sku || !name || !category || !unit) {
+    toast('Completa SKU, nombre, categoría y unidad.', 'error'); return;
+  }
+  if (category === '__NEW__' || unit === '__NEW__') {
+    toast('Elige o agrega una categoría/unidad válida.', 'error'); return;
+  }
+  const list = onboardingState.data.initialProducts || (onboardingState.data.initialProducts = []);
+  if (list.some(p => p.sku.toLowerCase() === sku.toLowerCase())) {
+    toast(`Ya hay un producto con SKU "${sku}".`, 'error'); return;
+  }
+  list.push({ sku, name, category, unit,
+    minStock: minStock || 0, currentStock: currentStock || 0, cost: cost || 0, price: price || 0 });
+  toast(`"${name}" agregado al catálogo.`, 'success');
+  render();
+}
+
+function submitOneShot(e) {
+  e.preventDefault();
+  const f = e.target;
+  if (!f.reportValidity()) return;
+  const d = onboardingState.data;
+  if (!d.vertical) { toast('Selecciona un tipo de negocio.', 'error'); return; }
+  if (d.vertical === 'other') {
+    const customName = (document.getElementById('custom-vertical-name')?.value || '').trim();
+    if (!customName) { toast('Describe tu tipo de negocio.', 'error'); return; }
+    d.customVerticalName = customName;
+  }
+  const fd = new FormData(f);
+  for (const [k, v] of fd.entries()) d[k] = v;
+  finishOnboarding();
+}
+
+// ----- Vertical-aware suggestions (help placeholders in catalog step) -----
+function suggestCategories(vertical) {
+  return ({
+    retail:   ['Abarrotes','Bebidas','Lácteos','Panadería','Aseo'],
+    bakery:   ['Insumos','Lácteos','Saborizantes','Productos terminados'],
+    hardware: ['Tornillería','Herramientas','Pinturas','Eléctricos','Plomería'],
+    pharmacy: ['Analgésicos','Antibióticos','Vitaminas','Higiene personal'],
+    petshop:  ['Alimento','Accesorios','Medicamentos','Higiene'],
+    other:    ['General'],
+  })[vertical] || ['General'];
+}
+function suggestUnits(vertical) {
+  return ({
+    retail:   ['Unidad','Kg','Litro','Paquete'],
+    bakery:   ['Kg','g','Litro','ml','Unidad','Docena'],
+    hardware: ['Unidad','Metro','Rollo','Caja','Litro'],
+    pharmacy: ['Caja','Unidad','Frasco','Blíster'],
+    petshop:  ['Bolsa','Unidad','Kg','Lata'],
+    other:    ['Unidad','Kg','Litro','Paquete','Caja'],
+  })[vertical] || ['Unidad'];
+}
+function suggestCategory(v) { return suggestCategories(v)[0] || 'General'; }
+function suggestUnit(v)     { return suggestUnits(v)[0] || 'Unidad'; }
+function suggestName(v) {
+  return ({
+    retail:'Arroz', bakery:'Vainilla', hardware:'Martillo',
+    pharmacy:'Loratadina 10mg', petshop:'Arena sanitaria', other:'Producto X',
+  })[v] || 'Nuevo producto';
+}
+function suggestSku(v, n) {
+  const p = ({ retail:'PRO', bakery:'INS', hardware:'HWR', pharmacy:'MED', petshop:'PET', other:'SKU' })[v] || 'SKU';
+  return `${p}-${String(n).padStart(3,'0')}`;
+}
+
+// ----- Main render
+function render() {
+  const app = document.getElementById('app');
+  if (!hasTenant()) {
+    app.innerHTML = viewOnboarding();
+    return;
+  }
+  // Shell with sidebar + main
+  app.innerHTML = `
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-icon">📦</span>
+          <div>
+            <div class="brand-title">${esc(store.tenant.name)}</div>
+            <div class="brand-sub">${(VERTICALS.find(v => v.code === store.tenant.vertical)?.icon || '📦')} ${esc(store.tenant.vertical === 'other' ? (store.tenant.customVerticalName || 'Negocio') : (VERTICALS.find(v => v.code === store.tenant.vertical)?.name || 'Negocio'))} · ${esc(store.tenant.currency)}</div>
+          </div>
+        </div>
+        <nav class="nav" id="nav"></nav>
+        <div class="sidebar-footer">
+          <div style="padding:8px 4px;margin-bottom:8px;font-size:11px;color:#94a3b8">
+            <div style="color:#e2e8f0;font-weight:500">${esc(store.user.name)}</div>
+            <div>${esc(store.user.role)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <button class="btn btn-primary btn-sm" onclick="startClientDemo()">🆕 Demo con datos del cliente</button>
+            <button class="btn btn-sm" onclick="restoreDemo()">↺ Restaurar demo de muestra</button>
+          </div>
+        </div>
+      </aside>
+      <main class="main" id="main"></main>
+    </div>`;
+
+  renderSidebar();
+  const views = {
+    'dashboard': viewDashboard,
+    'products':  viewProducts,
+    'stock-in':  viewStockIn,
+    'stock-out': viewStockOut,
+    'movements': viewMovements,
+    'reports':   viewReports,
+    'insights':  viewInsights,
+    'alerts':    viewAlerts,
+  };
+  const v = views[currentView] || viewDashboard;
+  document.getElementById('main').innerHTML = v();
+  renderChat();
+}
+
+// Bootstrap: if nothing is stored yet (first ever open), pre-load the sample demo.
+if (!hasTenant() && store.products.length === 0 && store.movements.length === 0) {
+  seedDemoCompany();
+}
+render();
+</script>
+</body>
+</html>

@@ -199,10 +199,18 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;back
 .health-gauge-value .big{font-size:36px;line-height:1}
 .health-gauge-value .small{font-size:11px;color:var(--muted);margin-top:4px;font-weight:500}
 
-.abc-card{border-radius:10px;padding:16px;text-align:center}
+.abc-card{border-radius:10px;padding:16px;text-align:center;cursor:pointer;transition:transform 150ms,box-shadow 150ms;display:flex;flex-direction:column;min-height:210px}
+.abc-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(15,23,42,.12)}
 .abc-count{font-size:30px;font-weight:700;line-height:1}
 .abc-label{font-weight:600;margin-top:4px;font-size:13px}
 .abc-hint{font-size:11px;opacity:.75;margin-top:4px}
+.abc-top{margin-top:10px;padding-top:10px;border-top:1px solid rgba(15,23,42,.1);text-align:left;flex:1;font-size:11.5px;line-height:1.35}
+.abc-top-item{display:flex;justify-content:space-between;gap:6px;padding:2px 0}
+.abc-top-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;font-weight:500}
+.abc-top-val{opacity:.8;font-size:10.5px;white-space:nowrap}
+.abc-top-more{opacity:.65;font-size:10.5px;font-style:italic;margin-top:3px}
+.abc-empty{opacity:.65;font-size:11px;font-style:italic}
+.abc-cta{margin-top:8px;padding-top:6px;font-size:10.5px;font-weight:600;border-top:1px solid rgba(15,23,42,.08);opacity:.85}
 
 .insight{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:14px 16px;border-radius:var(--radius);border-left:4px solid var(--border);background:var(--surface-2);margin-bottom:10px}
 .insight.danger{border-left-color:var(--danger);background:var(--danger-soft)}
@@ -1718,12 +1726,34 @@ function viewInsights() {
     mood = { icon:'🔴', color:'var(--danger)',  bg:'var(--danger-soft)',  title:'Requiere tu atención hoy', msg:`Tienes varios productos en alerta o por agotarse. Empieza por la lista de reposición urgente.` };
   }
 
+  // Agrupar productos por clase ABC con sus métricas para el detalle
+  const abcGroups = { A:[], B:[], C:[], Z:[] };
+  store.products.forEach(p => {
+    const cls = abc[p.id] || 'Z';
+    abcGroups[cls].push({
+      p,
+      qty: outQtySince(p.id, 30),
+      revenue: outRevenueSince(p.id, 30),
+      stock: stockOf(p.id),
+      daysIdle: daysSinceLastMovement(p.id),
+    });
+  });
+  // Orden por aporte en $ (desc) para A/B/C y por días sin venta (desc) para Z
+  abcGroups.A.sort((a,b) => b.revenue - a.revenue);
+  abcGroups.B.sort((a,b) => b.revenue - a.revenue);
+  abcGroups.C.sort((a,b) => b.revenue - a.revenue);
+  abcGroups.Z.sort((a,b) => b.daysIdle - a.daysIdle);
+
+  const totalRevenue30d = store.products.reduce((s,p) => s + outRevenueSince(p.id, 30), 0);
+
   const friendlyCards = [
     { k:'A', emoji:'⭐', label:'Estrellas',      hint:'Los que más te dan plata',          color:'#15803d', bg:'#dcfce7' },
     { k:'B', emoji:'💪', label:'Buenos',          hint:'Aportan bien al negocio',           color:'#b45309', bg:'#fef3c7' },
     { k:'C', emoji:'🔹', label:'Secundarios',     hint:'Aportan poco',                      color:'#4338ca', bg:'#e0e7ff' },
     { k:'Z', emoji:'💤', label:'Sin actividad',   hint:'No se vendieron el último mes',     color:'#64748b', bg:'#f1f5f9' },
   ];
+  // Exponer al modal sin regenerar los cálculos
+  window.__abcDetail = { groups: abcGroups, totalRevenue: totalRevenue30d, currency, cards: friendlyCards };
 
   return `
     <div class="page">
@@ -1806,14 +1836,29 @@ function viewInsights() {
           <span class="text-muted" style="font-size:12px">Últimos 30 días</span>
         </div>
         <div class="text-muted" style="font-size:13px;margin-bottom:14px">Agrupados según cuánta plata generan en ventas — te ayuda a saber a cuáles ponerle más atención.</div>
-        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">
-          ${friendlyCards.map(t => `
-            <div class="abc-card" style="background:${t.bg}">
-              <div style="font-size:22px;margin-bottom:4px">${t.emoji}</div>
-              <div class="abc-count" style="color:${t.color}">${abcCounts[t.k]}</div>
-              <div class="abc-label" style="color:${t.color}">${t.label}</div>
-              <div class="abc-hint">${t.hint}</div>
-            </div>`).join('')}
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">
+          ${friendlyCards.map(t => {
+            const items = abcGroups[t.k];
+            const top = items.slice(0, 3);
+            const isIdle = t.k === 'Z';
+            const preview = items.length === 0
+              ? `<div class="abc-empty">Sin productos en este grupo.</div>`
+              : top.map(x => {
+                  const val = isIdle
+                    ? `${x.daysIdle >= 9999 ? '—' : x.daysIdle + 'd'}`
+                    : formatMoney(x.revenue, currency);
+                  return `<div class="abc-top-item"><span class="abc-top-name">${esc(x.p.name)}</span><span class="abc-top-val" style="color:${t.color}">${val}</span></div>`;
+                }).join('') + (items.length > 3 ? `<div class="abc-top-more">+ ${items.length - 3} más</div>` : '');
+            return `
+              <div class="abc-card" style="background:${t.bg}" onclick="showAbcDetail('${t.k}')" title="Ver detalle de ${esc(t.label)}">
+                <div style="font-size:22px;margin-bottom:4px">${t.emoji}</div>
+                <div class="abc-count" style="color:${t.color}">${abcCounts[t.k]}</div>
+                <div class="abc-label" style="color:${t.color}">${t.label}</div>
+                <div class="abc-hint">${t.hint}</div>
+                <div class="abc-top">${preview}</div>
+                <div class="abc-cta" style="color:${t.color}">Ver detalle →</div>
+              </div>`;
+          }).join('')}
         </div>
         <details class="explain">
           <summary>¿Cómo agrupa el sistema mis productos?</summary>
@@ -1889,6 +1934,98 @@ function viewInsights() {
         </details>
       </section>
     </div>`;
+}
+
+// ===================================================================
+//  ABC DETAIL MODAL — drill-down desde "Cómo se comportan tus productos"
+// ===================================================================
+const ABC_META = {
+  A: { emoji:'⭐', label:'Estrellas',    color:'#15803d', bg:'#dcfce7',
+       desc:'Productos que concentran el primer 80% del dinero de ventas. <strong>No pueden faltar nunca.</strong>' },
+  B: { emoji:'💪', label:'Buenos',        color:'#b45309', bg:'#fef3c7',
+       desc:'Aportan entre el 80% y el 95% del ingreso. Importantes, con algo más de margen si se agotan un día.' },
+  C: { emoji:'🔹', label:'Secundarios',   color:'#4338ca', bg:'#e0e7ff',
+       desc:'Aportan el último 5% del ingreso. Útiles por variedad, pero no son críticos.' },
+  Z: { emoji:'💤', label:'Sin actividad', color:'#64748b', bg:'#f1f5f9',
+       desc:'No tuvieron ventas en los últimos 30 días. Candidatos a promociones, rebajas o salir del catálogo.' },
+};
+
+function showAbcDetail(cls) {
+  const data = window.__abcDetail;
+  if (!data) return;
+  const meta = ABC_META[cls];
+  const items = (data.groups[cls] || []).slice();
+  const currency = data.currency;
+  const totalRev = data.totalRevenue || 0;
+  const groupRev = items.reduce((s,x) => s + x.revenue, 0);
+  const groupPct = totalRev > 0 ? (groupRev / totalRev) * 100 : 0;
+  const isIdle = cls === 'Z';
+
+  const emptyMsg = isIdle
+    ? 'Todos tus productos tuvieron al menos una venta en los últimos 30 días.'
+    : 'Aún no hay productos en este grupo.';
+
+  const bodyHtml = items.length === 0
+    ? `<div class="empty" style="padding:24px"><div class="empty-icon">${meta.emoji}</div><strong>Sin productos aquí</strong><div class="text-muted" style="font-size:13px;margin-top:4px">${emptyMsg}</div></div>`
+    : `<table class="table">
+        <thead><tr>
+          <th>Producto</th>
+          <th class="num">Stock actual</th>
+          ${isIdle
+            ? `<th class="num">Días sin venta</th><th class="num">Valor inmovilizado</th>`
+            : `<th class="num">Vendido 30d</th><th class="num">Ingreso 30d</th><th class="num">% del total</th>`}
+          <th></th>
+        </tr></thead>
+        <tbody>
+          ${items.map(x => {
+            const pctRow = totalRev > 0 ? (x.revenue / totalRev) * 100 : 0;
+            const immob = x.stock * priceOf(x.p);
+            return `<tr>
+              <td>
+                <div style="font-weight:500">${esc(x.p.name)}</div>
+                <div style="font-size:11px;color:var(--muted)">${esc(x.p.sku)} · ${esc(x.p.category)}</div>
+              </td>
+              <td class="num">${x.stock} ${esc(x.p.unit)}</td>
+              ${isIdle
+                ? `<td class="num" style="font-weight:600;color:${x.daysIdle >= 60 ? 'var(--danger)' : 'var(--warning)'}">${x.daysIdle >= 9999 ? '—' : x.daysIdle}</td>
+                   <td class="num">${formatMoney(immob, currency)}</td>`
+                : `<td class="num">${x.qty} ${esc(x.p.unit)}</td>
+                   <td class="num" style="font-weight:600">${formatMoney(x.revenue, currency)}</td>
+                   <td class="num">${pctRow.toFixed(1)}%</td>`}
+              <td style="white-space:nowrap">
+                <button class="btn btn-sm" onclick="closeModal();openProductForm('${x.p.id}')">Ver</button>
+                ${isIdle
+                  ? `<button class="btn btn-sm" onclick="closeModal();navigate('stock-out')">Vender</button>`
+                  : `<button class="btn btn-sm" onclick="closeModal();navigate('stock-in')">Reponer</button>`}
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>`;
+
+  const summaryHtml = isIdle
+    ? `<div class="row" style="gap:8px;flex-wrap:wrap"><span class="badge" style="background:${meta.bg};color:${meta.color}">${items.length} producto(s)</span>${items.length ? `<span class="badge badge-info">Valor inmovilizado: ${formatMoney(items.reduce((s,x) => s + x.stock * priceOf(x.p), 0), currency)}</span>` : ''}</div>`
+    : `<div class="row" style="gap:8px;flex-wrap:wrap"><span class="badge" style="background:${meta.bg};color:${meta.color}">${items.length} producto(s)</span><span class="badge badge-info">Ingreso 30d: ${formatMoney(groupRev, currency)}</span><span class="badge">${groupPct.toFixed(1)}% del total</span></div>`;
+
+  const html = `
+    <div class="modal-overlay" onmousedown="this._downOnSelf=(event.target===this)" onmouseup="if(this._downOnSelf&&event.target===this){closeModal()} this._downOnSelf=false">
+      <div class="modal" style="max-width:880px">
+        <div class="modal-header" style="background:${meta.bg}">
+          <h2 style="color:${meta.color}">${meta.emoji} ${meta.label}</h2>
+          <button class="close-x" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <p style="margin:0 0 12px;color:var(--text);font-size:13.5px;line-height:1.5">${meta.desc}</p>
+          ${summaryHtml}
+          <div style="margin-top:14px">${bodyHtml}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn" onclick="closeModal()">Cerrar</button>
+          <button class="btn btn-primary" onclick="closeModal();navigate('products')">Ir al catálogo</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-root').innerHTML = html;
 }
 
 // ===================================================================

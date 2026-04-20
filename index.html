@@ -2656,7 +2656,7 @@ function viewOnboarding() {
             <button type="button" class="btn btn-sm" onclick="restoreDemo()" title="Volver a la empresa demo de muestra">↺ Usar demo de muestra</button>
           </div>
 
-          <form id="onb-main-form" onsubmit="submitOneShot(event)">
+          <form id="onb-main-form" onsubmit="submitOneShot(event)" oninput="onbInputChange(event)" onchange="onbInputChange(event)">
             <div style="padding:24px 32px">
 
               <section>
@@ -3181,6 +3181,12 @@ function captureOnbFormState() {
     if (k === 'vertical') continue;
     onboardingState.data[k] = v;
   }
+}
+
+function onbInputChange(e) {
+  const el = e.target;
+  if (!el || !el.name || el.name === 'vertical') return;
+  onboardingState.data[el.name] = el.value;
 }
 
 function selectVertical(code) {

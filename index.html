@@ -3299,6 +3299,7 @@ function addCatalogRow(e) {
 function removeCatalogRow(index) {
   const list = onboardingState.data.initialProducts || [];
   list.splice(index, 1);
+  captureOnbFormState();
   render();
 }
 function editCatalogStock(index, value) {
@@ -3330,6 +3331,7 @@ function addCatalogFromFields() {
   list.push({ sku, name, category, unit,
     minStock: minStock || 0, currentStock: currentStock || 0, cost: cost || 0, price: price || 0 });
   toast(`"${name}" agregado al catálogo.`, 'success');
+  captureOnbFormState();
   render();
 }
 

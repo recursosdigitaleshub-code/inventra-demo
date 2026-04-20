@@ -946,7 +946,7 @@ function openProductForm(id) {
   const current = editing ? stockOf(editing.id) : 0;
 
   const html = `
-    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+    <div class="modal-overlay" onmousedown="this._downOnSelf=(event.target===this)" onmouseup="if(this._downOnSelf&&event.target===this){closeModal()} this._downOnSelf=false">
       <div class="modal">
         <div class="modal-header">
           <h2>${title}</h2>
@@ -3173,7 +3173,18 @@ function __viewOnboardingLegacy() {
     </div>`;
 }
 
+function captureOnbFormState() {
+  const form = document.getElementById('onb-main-form');
+  if (!form) return;
+  const fd = new FormData(form);
+  for (const [k, v] of fd.entries()) {
+    if (k === 'vertical') continue;
+    onboardingState.data[k] = v;
+  }
+}
+
 function selectVertical(code) {
+  captureOnbFormState();
   const prev = onboardingState.data.vertical;
   onboardingState.data.vertical = code;
   // If the vertical changed, reset the seed catalog and the category/unit lists

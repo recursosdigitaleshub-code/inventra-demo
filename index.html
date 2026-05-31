@@ -176,6 +176,20 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;back
 *::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px;border:2px solid var(--surface-2)}
 *::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 
+/* panel de filtros colapsable */
+.filters-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);padding:14px 18px;transition:box-shadow 220ms var(--ease)}
+.filters-panel[open]{box-shadow:var(--shadow);padding-bottom:18px}
+.filters-panel summary{cursor:pointer;font-weight:600;font-family:var(--font-display);font-size:15px;list-style:none;display:flex;align-items:center;user-select:none}
+.filters-panel summary::-webkit-details-marker{display:none}
+.filters-panel summary::after{content:"⌄";margin-left:auto;font-size:18px;color:var(--muted);transition:transform 220ms var(--ease)}
+.filters-panel[open] summary::after{transform:rotate(180deg)}
+
+/* pestañas tipo pill */
+.pill-tabs{display:inline-flex;gap:3px;background:var(--surface-3);padding:4px;border-radius:11px;flex-wrap:wrap}
+.pill-tab{border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;cursor:pointer;transition:background 160ms var(--ease),color 160ms var(--ease),box-shadow 160ms var(--ease);white-space:nowrap}
+.pill-tab:hover{color:var(--text)}
+.pill-tab.active{background:var(--surface);color:var(--primary);box-shadow:var(--shadow-sm)}
+
 /* utilities */
 .mt-12{margin-top:12px} .mt-16{margin-top:16px} .mt-20{margin-top:20px}
 .w-100{width:100px} .text-muted{color:var(--muted)}
@@ -758,6 +772,7 @@ function recentMovements(n = 10) {
 }
 function productName(id) { return store.products.find(p => p.id === id)?.name ?? '—'; }
 function productSku(id)  { return store.products.find(p => p.id === id)?.sku ?? ''; }
+function productUnit(id) { return store.products.find(p => p.id === id)?.unit ?? ''; }
 function categories()   { return [...new Set(store.products.map(p => p.category))].sort(); }
 
 // ---------- MUTATIONS ----------
@@ -1209,7 +1224,7 @@ function viewDashboard() {
                   <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
                   <td>${esc(productName(m.productId))}</td>
                   <td><span class="badge ${inc ? 'badge-ok' : 'badge-warn'}">${MOVEMENT_LABELS[m.type]}</span></td>
-                  <td class="num">${inc ? '+' : '−'}${fmtQty(m.quantity)}</td>
+                  <td class="num">${inc ? '+' : '−'}${fmtQty(m.quantity)} <span class="text-muted" style="font-weight:400">${esc(productUnit(m.productId))}</span></td>
                 </tr>`;
               }).join('')}
               </tbody></table>`}
@@ -1549,7 +1564,7 @@ function viewStockIn() {
               ${recent.map(m => `<tr>
                 <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
                 <td>${esc(productName(m.productId))}</td>
-                <td class="num" style="color:var(--success);font-weight:600">+${fmtQty(m.quantity)}</td>
+                <td class="num" style="color:var(--success);font-weight:600">+${fmtQty(m.quantity)} <span class="text-muted" style="font-weight:400">${esc(productUnit(m.productId))}</span></td>
                 <td>${esc(m.reason)}</td>
               </tr>`).join('')}
               </tbody></table>`}
@@ -1676,7 +1691,7 @@ function viewStockOut() {
               ${recent.map(m => `<tr>
                 <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
                 <td>${esc(productName(m.productId))}</td>
-                <td class="num" style="color:var(--danger);font-weight:600">−${fmtQty(m.quantity)}</td>
+                <td class="num" style="color:var(--danger);font-weight:600">−${fmtQty(m.quantity)} <span class="text-muted" style="font-weight:400">${esc(productUnit(m.productId))}</span></td>
                 <td>${esc(m.reason)}</td>
               </tr>`).join('')}
               </tbody></table>`}
@@ -1789,8 +1804,9 @@ function viewMovements() {
     .filter(m => movementFilters.type ? m.type === movementFilters.type : true)
     .reverse();
 
+  // Conteo por nº de movimientos (no se suman cantidades: mezclan unidades distintas).
   let inQty = 0, outQty = 0;
-  filtered.forEach(m => m.incoming ? inQty += m.quantity : outQty += m.quantity);
+  filtered.forEach(m => m.incoming ? inQty++ : outQty++);
 
   return `
     <div class="page">
@@ -1822,7 +1838,7 @@ function viewMovements() {
           <div class="row" style="gap:8px">
             <span class="badge badge-ok">Entradas: ${inQty}</span>
             <span class="badge badge-warn">Salidas: ${outQty}</span>
-            <span class="badge badge-info">Neto: ${(inQty-outQty) >= 0 ? '+' : ''}${inQty-outQty}</span>
+            <span class="badge badge-info">${filtered.length} movimiento(s)</span>
           </div>
         </div>
 
@@ -1843,7 +1859,7 @@ function viewMovements() {
                     <div style="font-size:11px;color:var(--muted)">${esc(productSku(m.productId))}</div>
                   </td>
                   <td><span class="badge ${m.incoming?'badge-ok':'badge-warn'}">${m.typeLabel}</span></td>
-                  <td class="num" style="color:${m.incoming?'var(--success)':'var(--danger)'};font-weight:600">${m.incoming?'+':'−'}${fmtQty(m.quantity)}</td>
+                  <td class="num" style="color:${m.incoming?'var(--success)':'var(--danger)'};font-weight:600">${m.incoming?'+':'−'}${fmtQty(m.quantity)} <span class="text-muted" style="font-weight:400">${esc(productUnit(m.productId))}</span></td>
                   <td class="num">${m.runningBalance}</td>
                   <td>${esc(m.reason)}</td>
                   <td class="text-muted">${esc(m.reference || '—')}</td>
@@ -2669,6 +2685,9 @@ function clearReportFilters() {
   reportFilters = { from:'', to:'', productId:'', category:'', type:'' };
   render();
 }
+function reportHasActiveFilters() {
+  return !!(reportFilters.from || reportFilters.to || reportFilters.productId || reportFilters.category || reportFilters.type);
+}
 function computeReportData() {
   const filteredProducts = store.products.filter(p => {
     if (reportFilters.category  && p.category !== reportFilters.category)  return false;
@@ -2690,8 +2709,9 @@ function viewReports() {
   const cats = categories();
   const { filteredProducts, filteredMovements, stock } = computeReportData();
 
-  let totalIn = 0, totalOut = 0;
-  filteredMovements.forEach(m => { isIncoming(m.type) ? totalIn += m.quantity : totalOut += m.quantity; });
+  // Nº de movimientos por tipo (no se suman cantidades porque mezclan unidades distintas: g, Unidad, ct).
+  let inCount = 0, outCount = 0;
+  filteredMovements.forEach(m => { isIncoming(m.type) ? inCount++ : outCount++; });
   const totalUnitsFiltered = filteredProducts.reduce((s,p) => s + Math.max(0, stock[p.id] ?? 0), 0);
   const inventoryValue     = filteredProducts.reduce((s,p) => s + (stock[p.id] ?? 0) * (p.price ?? 0), 0);
 
@@ -2708,9 +2728,12 @@ function viewReports() {
         </div>
       </div>
 
-      <section class="card">
-        <h3 style="margin:0 0 12px">Filtros</h3>
-        <div class="form-grid">
+      <details class="filters-panel"${reportHasActiveFilters() ? ' open' : ''}>
+        <summary>
+          <span>⚙️ Filtros</span>
+          ${reportHasActiveFilters() ? '<span class="badge badge-info" style="margin-left:8px">activos</span>' : '<span class="text-muted" style="font-size:12px;margin-left:8px">todos los datos</span>'}
+        </summary>
+        <div class="form-grid" style="margin-top:14px">
           <div class="field"><label>Desde</label>
             <input type="date" value="${esc(reportFilters.from)}" onchange="reportFilters.from=this.value;render()"/>
           </div>
@@ -2739,7 +2762,7 @@ function viewReports() {
             </select>
           </div>
         </div>
-      </section>
+      </details>
 
       <div class="grid grid-4 mt-16">
         <div class="stat-card">
@@ -2749,13 +2772,13 @@ function viewReports() {
         </div>
         <div class="stat-card ok">
           <div class="stat-label">Entradas</div>
-          <div class="stat-value">${totalIn}</div>
-          <div class="stat-hint">Suma del período</div>
+          <div class="stat-value">${inCount}</div>
+          <div class="stat-hint">movimiento(s) en el período</div>
         </div>
-        <div class="stat-card ${totalOut>totalIn?'alert':''}">
+        <div class="stat-card">
           <div class="stat-label">Salidas</div>
-          <div class="stat-value">${totalOut}</div>
-          <div class="stat-hint">Neto: ${(totalIn-totalOut)>=0?'+':''}${totalIn-totalOut}</div>
+          <div class="stat-value">${outCount}</div>
+          <div class="stat-hint">movimiento(s) en el período</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Valor de inventario</div>
@@ -2765,9 +2788,9 @@ function viewReports() {
       </div>
 
       <section class="card mt-16">
-        <div class="row" style="margin-bottom:12px">
-          <div class="row" style="gap:6px">
-            ${REPORT_TABS.map(t => `<button class="btn btn-sm ${reportTab===t.key?'btn-primary':''}" onclick="reportTab='${t.key}';render()">${t.label}</button>`).join('')}
+        <div class="row" style="margin-bottom:16px;align-items:center">
+          <div class="pill-tabs">
+            ${REPORT_TABS.map(t => `<button class="pill-tab ${reportTab===t.key?'active':''}" onclick="reportTab='${t.key}';render()">${t.label}</button>`).join('')}
           </div>
           <div class="spacer"></div>
           <span class="badge badge-muted">${filteredMovements.length} movimiento(s) en el rango</span>
@@ -2997,7 +3020,7 @@ function renderMovementsReport(movements) {
         <div style="font-size:11px;color:var(--muted)">${esc(productSku(m.productId))}</div>
       </td>
       <td><span class="badge ${inc?'badge-ok':'badge-warn'}">${MOVEMENT_LABELS[m.type]}</span></td>
-      <td class="num" style="color:${inc?'var(--success)':'var(--danger)'};font-weight:600">${inc?'+':'−'}${fmtQty(m.quantity)}</td>
+      <td class="num" style="color:${inc?'var(--success)':'var(--danger)'};font-weight:600">${inc?'+':'−'}${fmtQty(m.quantity)} <span class="text-muted" style="font-weight:400">${esc(productUnit(m.productId))}</span></td>
       <td class="num">${unitCell}</td>
       <td class="num">${totalCell}</td>
       <td>${esc(m.reason)}</td>

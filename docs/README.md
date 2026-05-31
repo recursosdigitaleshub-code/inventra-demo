@@ -23,6 +23,8 @@ Esta carpeta contiene la documentación funcional, técnica y de negocio de **In
 | 08 | [API y contratos](08-api-contratos.md) | Backend, frontend | Endpoints REST sugeridos, payloads, errores |
 | 09 | [Patrones UX/UI](09-ux-ui-patrones.md) | Frontend, diseño | Componentes, tokens, estados, accesibilidad |
 | 10 | [Glosario](10-glosario.md) | Todos | Términos del dominio en español Colombia |
+| 11 | [Stack y arquitectura (as-built)](11-stack-y-arquitectura.md) | Devs, arquitectos | Stack real desplegado vs. objetivo, roadmap a Firebase, despliegue |
+| 12 | [Validación de arquitectura (revisión senior)](12-validacion-arquitectura.md) | Devs, arquitectos | Validación del stack con fuentes oficiales, Firebase vs Supabase, arquitectura objetivo |
 
 ## Convenciones
 

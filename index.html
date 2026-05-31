@@ -276,8 +276,102 @@ const LS_BRANCHES  = 'inventra.demo.branches';
 const LS_SETTINGS  = 'inventra.demo.settings';
 const LS_PRODUCTS  = 'inventra.demo.products';
 const LS_MOVEMENTS = 'inventra.demo.movements';
+const LS_USERS     = 'inventra.demo.users';      // lista de usuarios del tenant
+const LS_ACTIVE    = 'inventra.demo.activeUser'; // id del usuario activo (selector)
 
 const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
+
+// ---------- ROLES Y PERMISOS ----------
+// Catálogo de permisos granulares. Cada rol activa un subconjunto.
+const PERMISSIONS = {
+  view_dashboard:  'Ver dashboard y panorama',
+  manage_products: 'Crear / editar / eliminar productos',
+  stock_in:        'Registrar entradas de inventario',
+  stock_out:       'Registrar salidas / ventas',
+  adjust:          'Hacer ajustes de inventario',
+  view_costs:      'Ver costos y márgenes',
+  view_reports:    'Ver reportes e inteligencia',
+  export:          'Exportar datos (CSV)',
+  manage_users:    'Gestionar usuarios y roles',
+  settings:        'Configuración de la empresa',
+  danger_zone:     'Restaurar / borrar datos',
+  // Específicos de joyería (alto valor del oro):
+  gold_spot:       'Editar la cotización (spot) del oro',
+  gold_buy:        'Comprar oro a clientes (oro usado)',
+};
+
+// Roles predefinidos. `*` = todos los permisos.
+const ROLES = {
+  owner:   { name:'Propietario', icon:'👑', desc:'Acceso total al sistema.',
+    perms:'*' },
+  manager: { name:'Gerente', icon:'🧑‍💼', desc:'Opera y supervisa; no gestiona usuarios ni borra datos.',
+    perms:['view_dashboard','manage_products','stock_in','stock_out','adjust','view_costs','view_reports','export','settings','gold_spot','gold_buy'] },
+  cashier: { name:'Cajero / Vendedor', icon:'🧾', desc:'Registra ventas y consulta stock. No ve costos.',
+    perms:['view_dashboard','stock_out','view_reports'] },
+  stock:   { name:'Almacenista', icon:'📦', desc:'Recibe mercancía y ajusta conteos.',
+    perms:['view_dashboard','manage_products','stock_in','adjust'] },
+  viewer:  { name:'Solo lectura / Auditor', icon:'👁️', desc:'Ve todo, no modifica nada.',
+    perms:['view_dashboard','view_costs','view_reports','export'] },
+};
+function roleLabel(code) { const r = ROLES[code]; return r ? `${r.icon} ${r.name}` : code; }
+
+// CRUD de usuarios (Fase 1: sin contraseña, los permisos se aplican en el cliente).
+function addUser(name, email, role) {
+  name = (name || '').trim(); email = (email || '').trim();
+  if (!name) throw new Error('El nombre es obligatorio.');
+  if (!ROLES[role]) throw new Error('Rol inválido.');
+  if (email && store.users.some(u => u.email && u.email.toLowerCase() === email.toLowerCase()))
+    throw new Error(`Ya existe un usuario con el correo "${email}".`);
+  const u = { id: uid(), name, email, role, tenantId: store.tenant?.id };
+  store.users.push(u);
+  save(LS_USERS, store.users);
+  return u;
+}
+function updateUserRole(id, role) {
+  if (!ROLES[role]) return;
+  const u = store.users.find(x => x.id === id);
+  if (!u) return;
+  // No permitir quedarse sin ningún propietario.
+  if (u.role === 'owner' && role !== 'owner' && store.users.filter(x => x.role === 'owner').length <= 1) {
+    toast('Debe existir al menos un Propietario.', 'error'); return;
+  }
+  u.role = role;
+  save(LS_USERS, store.users);
+  render();
+}
+function removeUser(id) {
+  const u = store.users.find(x => x.id === id);
+  if (!u) return;
+  if (u.role === 'owner' && store.users.filter(x => x.role === 'owner').length <= 1) {
+    toast('No puedes eliminar al único Propietario.', 'error'); return;
+  }
+  if (!confirm(`¿Eliminar al usuario "${u.name}"?`)) return;
+  store.users = store.users.filter(x => x.id !== id);
+  save(LS_USERS, store.users);
+  if (load(LS_ACTIVE, null) === id) save(LS_ACTIVE, store.users[0]?.id || null);
+  render();
+}
+function switchActiveUser(id) {
+  save(LS_ACTIVE, id);
+  render();
+  const u = activeUser();
+  if (u) toast(`Ahora operas como ${u.name} (${roleLabel(u.role)}).`, 'info');
+}
+
+function activeUser() {
+  const id = load(LS_ACTIVE, null);
+  const u = (store.users || []).find(x => x.id === id);
+  return u || (store.users || [])[0] || store.user || null;
+}
+// ¿El usuario activo tiene el permiso? El owner siempre; permisos de oro solo aplican a joyería.
+function can(perm) {
+  const u = activeUser();
+  if (!u) return true; // sin usuarios definidos (demo viejo) → no se bloquea nada
+  const role = ROLES[u.role];
+  if (!role) return true;
+  if ((perm === 'gold_spot' || perm === 'gold_buy') && !isJewelry()) return false;
+  return role.perms === '*' || role.perms.includes(perm);
+}
 
 const MOVEMENT_LABELS = {
   in: 'Entrada', out: 'Salida',
@@ -291,8 +385,106 @@ const VERTICALS = [
   { code:'hardware', icon:'🔧', name:'Ferretería',   desc:'Herramientas y materiales' },
   { code:'pharmacy', icon:'💊', name:'Farmacia',     desc:'Medicamentos con lote' },
   { code:'petshop',  icon:'🐾', name:'Mascotas',     desc:'Alimento y accesorios' },
+  { code:'jewelry',  icon:'💍', name:'Joyería',      desc:'Oro y piezas por gramo / quilataje' },
   { code:'other',    icon:'📦', name:'Otro',         desc:'Configuración personalizada' },
 ];
+
+// Verticales cuyo inventario se mide por peso/medida y por tanto admiten cantidades decimales.
+// El resto opera en unidades enteras (no se vende media unidad de tornillo).
+const DECIMAL_UNITS = ['g','gr','gramo','gramos','kg','kilo','litro','l','ml','ct','quilate','quilates','metro','m','onza','oz'];
+function unitAllowsDecimals(unit) {
+  return DECIMAL_UNITS.includes(String(unit || '').trim().toLowerCase());
+}
+// step para inputs de cantidad según la unidad del producto.
+function qtyStep(unit) { return unitAllowsDecimals(unit) ? '0.01' : '1'; }
+function qtyMin(unit)  { return unitAllowsDecimals(unit) ? '0.01' : '1'; }
+// Formatea una cantidad respetando decimales solo cuando hacen falta (3 → "3", 3.75 → "3,75").
+function fmtQty(n) {
+  const v = Number(n) || 0;
+  return Number.isInteger(v) ? String(v) : v.toLocaleString('es-CO', { maximumFractionDigits: 3 });
+}
+
+// ---------- ORO / QUILATAJE ----------
+// Leyes de oro soportadas y su pureza (fracción de oro fino).
+const GOLD_KARATS = [
+  { k: 24, label: '24K (oro fino)', purity: 1.000 },
+  { k: 22, label: '22K',           purity: 0.916 },
+  { k: 18, label: '18K',           purity: 0.750 },
+  { k: 14, label: '14K',           purity: 0.585 },
+  { k: 10, label: '10K',           purity: 0.417 },
+  { k:  0, label: 'No aplica',     purity: 0      },
+];
+function karatPurity(k) { return (GOLD_KARATS.find(x => x.k === Number(k)) || { purity: 0 }).purity; }
+// Valor de mercado del oro contenido en una pieza:
+//   gramos × pureza(karat) × precio del gramo de oro fino (24K) configurado por el tenant.
+function goldValue(grams, karat) {
+  const spot = Number(store.settings?.goldSpotPerGram) || 0;
+  return (Number(grams) || 0) * karatPurity(karat) * spot;
+}
+function isJewelry() { return store.tenant?.vertical === 'jewelry'; }
+
+// Valor total del oro contenido en el inventario, al precio spot configurado.
+function totalGoldValue() {
+  const stock = stockByProduct();
+  return store.products.reduce((a, p) => a + (Number(p.karat) > 0 ? goldValue(stock[p.id] ?? 0, p.karat) : 0), 0);
+}
+// Gramos de oro fino equivalente en inventario (suma ponderada por pureza).
+function totalFineGrams() {
+  const stock = stockByProduct();
+  return store.products.reduce((a, p) => a + (Number(p.karat) > 0 ? (stock[p.id] ?? 0) * karatPurity(p.karat) : 0), 0);
+}
+function updateGoldSpot(value) {
+  if (!can('gold_spot')) { toast('Tu perfil no puede editar la cotización del oro.', 'error'); return; }
+  const v = Number(value);
+  if (!store.settings) store.settings = {};
+  store.settings.goldSpotPerGram = isNaN(v) || v < 0 ? 0 : v;
+  store.settings.goldSpotUpdatedAt = new Date().toISOString();
+  save(LS_SETTINGS, store.settings);
+  render();
+}
+// Tarjeta de cotización del oro para el dashboard de joyería.
+function goldSpotCard(currency) {
+  const spot = Number(store.settings?.goldSpotPerGram) || 0;
+  const updated = store.settings?.goldSpotUpdatedAt ? formatDate(store.settings.goldSpotUpdatedAt) : 'nunca';
+  const fineGrams = totalFineGrams();
+  return `
+    <div class="card" style="background:linear-gradient(135deg,#fef9e7,#fdf2d0);border:1px solid #e8d48a;margin-bottom:16px">
+      <div class="row" style="align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="font-size:32px">🥇</div>
+        <div style="flex:1;min-width:220px">
+          <div style="font-weight:700;color:#7a5c00">Cotización del oro (precio spot)</div>
+          <div class="hint" style="color:#8a6d1f">Precio del gramo de oro fino (24K). Actualízalo con la cotización del día — sirve para valuar todo el inventario y sugerir precios de compra/venta.</div>
+        </div>
+        <div class="field" style="min-width:200px">
+          <label style="color:#7a5c00">Precio por gramo fino (${esc(currency)})</label>
+          <input type="number" min="0" step="0.01" value="${spot || ''}" placeholder="Ej: 300000"
+                 ${can('gold_spot') ? `onchange="updateGoldSpot(this.value)"` : 'disabled title="Tu perfil no puede editar la cotización"'} style="font-weight:600"/>
+          <div class="hint" style="color:#8a6d1f">Última actualización: ${updated}${can('gold_spot') ? '' : ' · 🔒 solo Admin/Gerente'}</div>
+        </div>
+        <div style="text-align:right;min-width:160px">
+          <div class="stat-label" style="color:#7a5c00">Oro fino en inventario</div>
+          <div style="font-size:20px;font-weight:700;color:#7a5c00">${fmtQty(Math.round(fineGrams * 100) / 100)} g</div>
+          <div class="hint" style="color:#8a6d1f">${spot > 0 ? '≈ ' + formatMoney(totalGoldValue(), currency) : 'Configura el spot para valuar'}</div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// ---------- FLUJO COMPRA/VENTA DE ORO (solo joyería) ----------
+// En joyería el precio de una pieza de oro se deriva del peso, la ley y el spot del día,
+// más un margen de taller/fabricación. Estas funciones sugieren precios y calculan totales.
+//
+// Precio de COMPRA de oro a cliente (compra de oro usado / chatarra):
+//   normalmente se paga un % del valor spot del oro fino contenido (la joyería gana en el descuento).
+function suggestGoldBuyPrice(grams, karat, pctOfSpot = 0.90) {
+  return goldValue(grams, karat) * pctOfSpot;
+}
+// Precio de VENTA de una pieza de oro:
+//   valor del oro fino contenido + margen de fabricación/taller (% sobre el oro).
+function suggestGoldSellPrice(grams, karat, makingPct = 0.25) {
+  const base = goldValue(grams, karat);
+  return base * (1 + makingPct);
+}
 
 const CURRENCIES = ['COP','USD','MXN','EUR','PEN','CLP','ARS','BRL'];
 const TIMEZONES  = ['America/Bogota','America/Mexico_City','America/Lima','America/Santiago','America/Buenos_Aires','America/Sao_Paulo','America/New_York','Europe/Madrid'];
@@ -339,6 +531,16 @@ function defaultCategoriesFor(vertical) {
       { sku:'JUG-001', name:'Pelota de juguete',          category:'Juguetes',        unit:'Unidad', minStock:10, price:8.00,  currentStock:25 },
       { sku:'ANT-001', name:'Antipulgas tabletas',        category:'Salud animal',    unit:'Caja',   minStock:5,  price:22.00, currentStock:10 },
     ];
+    case 'jewelry': return [
+      { sku:'ORO-24', name:'Oro fino 24K',        category:'Oro',         unit:'g',      minStock:50,  price:0,      currentStock:120,  karat:24 },
+      { sku:'ORO-22', name:'Oro 22K',             category:'Oro',         unit:'g',      minStock:30,  price:0,      currentStock:80,   karat:22 },
+      { sku:'ORO-18', name:'Oro 18K',             category:'Oro',         unit:'g',      minStock:40,  price:0,      currentStock:150.5,karat:18 },
+      { sku:'ORO-14', name:'Oro 14K',             category:'Oro',         unit:'g',      minStock:40,  price:0,      currentStock:95.25,karat:14 },
+      { sku:'ANI-001',name:'Anillo compromiso 18K',category:'Anillos',    unit:'Unidad', minStock:3,   price:1200000,currentStock:8,    karat:18 },
+      { sku:'CAD-001',name:'Cadena eslabón 18K',  category:'Cadenas',     unit:'g',      minStock:20,  price:0,      currentStock:60.75,karat:18 },
+      { sku:'ARE-001',name:'Aretes oro 14K (par)',category:'Aretes',      unit:'Unidad', minStock:5,   price:480000, currentStock:12,   karat:14 },
+      { sku:'DIA-001',name:'Diamante 0.25ct',     category:'Piedras',     unit:'ct',     minStock:2,   price:2500000,currentStock:5.5,  karat:0  },
+    ];
     case 'retail': return [
       { sku:'ARR-001', name:'Arroz 1kg',                category:'Abarrotes', unit:'Kg',     minStock:20, price:2.50, currentStock:60 },
       { sku:'AZU-001', name:'Azúcar blanca 1kg',        category:'Abarrotes', unit:'Kg',     minStock:10, price:3.00, currentStock:35 },
@@ -360,6 +562,7 @@ function defaultCategoriesListFor(vertical) {
     hardware: ['Tornillería','Herramientas','Pinturas','Eléctricos','Iluminación','Plomería','Jardinería','Seguridad'],
     pharmacy: ['Analgésicos','Antibióticos','Antihistamínicos','Vitaminas','Higiene personal','Instrumentos','Dermatológicos','Cuidado infantil'],
     petshop:  ['Alimento perros','Alimento gatos','Accesorios','Higiene','Juguetes','Salud animal','Transporte','Acuarios'],
+    jewelry:  ['Oro','Anillos','Cadenas','Aretes','Pulseras','Dijes','Piedras','Plata','Relojes','Reparaciones'],
     other:    [],
   })[vertical] || [];
 }
@@ -371,6 +574,7 @@ function defaultUnitsListFor(vertical) {
     hardware: ['Unidad','Metro','Rollo','Caja','Litro','Juego','Par'],
     pharmacy: ['Caja','Unidad','Frasco','Blíster','Ampolla','Tubo'],
     petshop:  ['Bolsa','Unidad','Kg','Lata','Frasco','Caja'],
+    jewelry:  ['g','ct','Unidad','Par','Onza'],
     other:    ['Unidad','Kg','Litro','Paquete','Caja'],
   })[vertical] || ['Unidad'];
 }
@@ -384,6 +588,7 @@ function save(key, value) { try { localStorage.setItem(key, JSON.stringify(value
 const store = {
   tenant:    load(LS_TENANT, null),
   user:      load(LS_USER, null),
+  users:     load(LS_USERS, []),
   branches:  load(LS_BRANCHES, []),
   settings:  load(LS_SETTINGS, null),
   products:  load(LS_PRODUCTS, []),
@@ -420,7 +625,12 @@ function productSku(id)  { return store.products.find(p => p.id === id)?.sku ?? 
 function categories()   { return [...new Set(store.products.map(p => p.category))].sort(); }
 
 // ---------- MUTATIONS ----------
+// Guard de permisos: lanza si el usuario activo no tiene el permiso requerido.
+function requirePerm(perm, action) {
+  if (!can(perm)) throw new Error(`Tu perfil (${roleLabel(activeUser()?.role)}) no tiene permiso para ${action}.`);
+}
 function createProduct(data) {
+  requirePerm('manage_products', 'crear productos');
   const exists = store.products.some(p => p.sku.toLowerCase() === data.sku.trim().toLowerCase());
   if (exists) throw new Error(`Ya existe un producto con SKU "${data.sku}".`);
   const p = { ...data, id: uid(), createdAt: new Date().toISOString() };
@@ -429,6 +639,7 @@ function createProduct(data) {
   return p;
 }
 function updateProduct(id, patch) {
+  requirePerm('manage_products', 'editar productos');
   const dup = store.products.find(p => p.sku.toLowerCase() === (patch.sku||'').trim().toLowerCase() && p.id !== id);
   if (dup) throw new Error(`Ya existe otro producto con SKU "${patch.sku}".`);
   const i = store.products.findIndex(p => p.id === id);
@@ -437,6 +648,7 @@ function updateProduct(id, patch) {
   save(LS_PRODUCTS, store.products);
 }
 function deleteProduct(id) {
+  requirePerm('manage_products', 'eliminar productos');
   if (store.movements.some(m => m.productId === id)) {
     throw new Error('No se puede eliminar un producto con movimientos registrados.');
   }
@@ -444,6 +656,11 @@ function deleteProduct(id) {
   save(LS_PRODUCTS, store.products);
 }
 function registerMovement(input) {
+  // Permiso según el tipo de movimiento.
+  if (input.reason === 'Compra de oro a cliente') requirePerm('gold_buy', 'comprar oro a clientes');
+  else if (input.type === 'in') requirePerm('stock_in', 'registrar entradas');
+  else if (input.type === 'adjust_neg' || input.type === 'adjust_pos') requirePerm('adjust', 'hacer ajustes');
+  else requirePerm('stock_out', 'registrar salidas');
   if (input.quantity <= 0) throw new Error('La cantidad debe ser mayor a 0.');
   const product = store.products.find(p => p.id === input.productId);
   if (!product) throw new Error('Producto no encontrado.');
@@ -458,8 +675,8 @@ function registerMovement(input) {
   return mv;
 }
 function clearAllData() {
-  [LS_TENANT, LS_USER, LS_BRANCHES, LS_SETTINGS, LS_PRODUCTS, LS_MOVEMENTS].forEach(k => localStorage.removeItem(k));
-  store.tenant = null; store.user = null; store.branches = []; store.settings = null;
+  [LS_TENANT, LS_USER, LS_USERS, LS_ACTIVE, LS_BRANCHES, LS_SETTINGS, LS_PRODUCTS, LS_MOVEMENTS].forEach(k => localStorage.removeItem(k));
+  store.tenant = null; store.user = null; store.users = []; store.branches = []; store.settings = null;
   store.products = []; store.movements = [];
   onboardingState = { step: 0, data: {} };
 }
@@ -493,6 +710,9 @@ function seedDemoCompany() {
     createdAt: nowIso,
   };
   store.user = { id: uid(), name: 'Administrador Demo', email: 'demo@inventra.ai', role: 'Propietario', tenantId: tid };
+  store.users = [{ id: store.user.id, name: store.user.name, email: store.user.email, role: 'owner', tenantId: tid }];
+  save(LS_USERS, store.users);
+  save(LS_ACTIVE, store.user.id);
   store.branches = [{ id: uid(), tenantId: tid, name: 'Sucursal Principal', address: 'Calle 10 #5-20, Bogotá' }];
   store.settings = {
     tenantId: tid,
@@ -620,6 +840,8 @@ function finishOnboarding() {
     email: d.adminEmail,
     role: 'Administrador',
   };
+  // El usuario que crea la empresa es el Propietario (owner) con acceso total.
+  store.users = [{ id: store.user.id, name: d.adminName, email: d.adminEmail, role: 'owner', tenantId: store.tenant.id }];
   store.branches = [{
     id: uid(),
     name: d.branchName,
@@ -640,6 +862,7 @@ function finishOnboarding() {
     minStock: Number(p.minStock) || 0,
     cost: Number(p.cost) || 0,
     price: Number(p.price) || 0,
+    ...(p.karat != null ? { karat: Number(p.karat) || 0 } : {}),
     createdAt: now,
   }));
   // Generate "Saldo inicial" movements for products with currentStock > 0
@@ -663,6 +886,8 @@ function finishOnboarding() {
 
   save(LS_TENANT, store.tenant);
   save(LS_USER, store.user);
+  save(LS_USERS, store.users);
+  save(LS_ACTIVE, store.user.id);
   save(LS_BRANCHES, store.branches);
   save(LS_SETTINGS, store.settings);
   save(LS_PRODUCTS, store.products);
@@ -686,14 +911,15 @@ function toast(msg, kind = 'info') {
 
 // ---------- ROUTING ----------
 const NAV = [
-  { path: 'dashboard', label: 'Dashboard',  icon: '🏠' },
-  { path: 'products',  label: 'Productos',  icon: '📋' },
-  { path: 'stock-in',  label: 'Entradas',   icon: '⬇️' },
-  { path: 'stock-out', label: 'Salidas',    icon: '⬆️' },
-  { path: 'movements', label: 'Movimientos',icon: '📜' },
-  { path: 'reports',   label: 'Reportes',   icon: '📊' },
-  { path: 'insights',  label: 'Inteligencia',icon:'🧠' },
-  { path: 'alerts',    label: 'Alertas',    icon: '🔔' },
+  { path: 'dashboard', label: 'Dashboard',  icon: '🏠', perm: 'view_dashboard' },
+  { path: 'products',  label: 'Productos',  icon: '📋', perm: 'view_dashboard' },
+  { path: 'stock-in',  label: 'Entradas',   icon: '⬇️', perm: 'stock_in' },
+  { path: 'stock-out', label: 'Salidas',    icon: '⬆️', perm: 'stock_out' },
+  { path: 'movements', label: 'Movimientos',icon: '📜', perm: 'view_dashboard' },
+  { path: 'reports',   label: 'Reportes',   icon: '📊', perm: 'view_reports' },
+  { path: 'insights',  label: 'Inteligencia',icon:'🧠', perm: 'view_reports' },
+  { path: 'alerts',    label: 'Alertas',    icon: '🔔', perm: 'view_dashboard' },
+  { path: 'users',     label: 'Usuarios',   icon: '👥', perm: 'manage_users' },
 ];
 let currentView = (location.hash.slice(1) || 'dashboard');
 window.addEventListener('hashchange', () => { currentView = location.hash.slice(1) || 'dashboard'; render(); });
@@ -707,7 +933,7 @@ function esc(s) {
 
 function renderSidebar() {
   const alerts = lowStockProducts().length;
-  document.getElementById('nav').innerHTML = NAV.map(n => `
+  document.getElementById('nav').innerHTML = NAV.filter(n => !n.perm || can(n.perm)).map(n => `
     <div class="nav-item ${n.path === currentView ? 'active' : ''}" onclick="navigate('${n.path}')">
       <span class="nav-icon">${n.icon}</span>
       <span class="nav-label">${n.label}</span>
@@ -730,7 +956,14 @@ function viewDashboard() {
   const insights = computeInsights().filter(i => i.level !== 'success').slice(0, 3);
   const currency = store.tenant?.currency || 'COP';
   const stock = stockByProduct();
-  const invValue = store.products.reduce((a,p) => a + (stock[p.id] ?? 0) * priceOf(p), 0);
+  // Valor de inventario: precio de lista × stock. En joyería, si la pieza no tiene precio
+  // de lista pero sí ley de oro, se valúa por el oro contenido al spot del día.
+  const invValue = store.products.reduce((a,p) => {
+    const qty = stock[p.id] ?? 0;
+    const byPrice = qty * priceOf(p);
+    if (isJewelry() && byPrice === 0 && Number(p.karat) > 0) return a + goldValue(qty, p.karat);
+    return a + byPrice;
+  }, 0);
   const circ = 2 * Math.PI * 42;
   const offset = circ - (score / 100) * circ;
 
@@ -742,10 +975,12 @@ function viewDashboard() {
           <div class="page-subtitle">Panorama de inventario en tiempo real</div>
         </div>
         <div class="row">
-          <button class="btn" onclick="navigate('stock-in')">⬇️ Nueva entrada</button>
-          <button class="btn btn-primary" onclick="navigate('stock-out')">⬆️ Nueva salida</button>
+          ${can('stock_in') ? `<button class="btn" onclick="navigate('stock-in')">⬇️ Nueva entrada</button>` : ''}
+          ${can('stock_out') ? `<button class="btn btn-primary" onclick="navigate('stock-out')">⬆️ Nueva salida</button>` : ''}
         </div>
       </div>
+
+      ${isJewelry() ? goldSpotCard(currency) : ''}
 
       <div class="grid grid-4">
         <div class="stat-card" style="display:flex;gap:14px;align-items:center;cursor:pointer" onclick="navigate('insights')">
@@ -815,9 +1050,9 @@ function viewDashboard() {
               ${low.map(p => `
                 <tr>
                   <td><div style="font-weight:500">${esc(p.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(p.sku)}</div></td>
-                  <td class="num">${p.current} ${esc(p.unit)}</td>
-                  <td class="num">${p.minStock} ${esc(p.unit)}</td>
-                  <td><span class="badge badge-danger">Reponer ${p.missing}</span></td>
+                  <td class="num">${fmtQty(p.current)} ${esc(p.unit)}</td>
+                  <td class="num">${fmtQty(p.minStock)} ${esc(p.unit)}</td>
+                  <td><span class="badge badge-danger">Reponer ${fmtQty(p.missing)}</span></td>
                 </tr>`).join('')}
               </tbody></table>`}
         </section>
@@ -838,7 +1073,7 @@ function viewDashboard() {
                   <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
                   <td>${esc(productName(m.productId))}</td>
                   <td><span class="badge ${inc ? 'badge-ok' : 'badge-warn'}">${MOVEMENT_LABELS[m.type]}</span></td>
-                  <td class="num">${inc ? '+' : '−'}${m.quantity}</td>
+                  <td class="num">${inc ? '+' : '−'}${fmtQty(m.quantity)}</td>
                 </tr>`;
               }).join('')}
               </tbody></table>`}
@@ -871,7 +1106,7 @@ function viewProducts() {
           <h1 class="page-title">Productos</h1>
           <div class="page-subtitle">${store.products.length} producto(s) · ${totalUnits()} unidad(es) en stock</div>
         </div>
-        <button class="btn btn-primary" onclick="openProductForm()">+ Nuevo producto</button>
+        ${can('manage_products') ? `<button class="btn btn-primary" onclick="openProductForm()">+ Nuevo producto</button>` : ''}
       </div>
 
       <div class="card">
@@ -897,15 +1132,17 @@ function viewProducts() {
           </div>
         </div>
 
-        ${rows.length === 0
+        ${(() => { const showCost = can('view_costs'); const showActions = can('manage_products'); return rows.length === 0
           ? `<div class="empty"><div class="empty-icon">🔍</div><strong>Sin resultados</strong><div>Ajusta los filtros o crea un nuevo producto.</div></div>`
           : `<table class="table">
               <thead><tr>
                 <th>SKU</th><th>Nombre</th><th>Categoría</th><th>Unidad</th>
+                ${isJewelry() ? '<th class="num">Ley</th>' : ''}
                 <th class="num">Stock</th><th class="num">Mín.</th>
-                <th class="num" title="Costo promedio ponderado (WAC) calculado sobre todas las compras registradas">Costo prom.</th>
-                <th class="num">Precio</th><th class="num">Margen</th>
-                <th>Estado</th><th></th>
+                ${isJewelry() ? '<th class="num" title="Valor del oro contenido al precio spot configurado">Valor oro</th>' : ''}
+                ${showCost ? '<th class="num" title="Costo promedio ponderado (WAC) calculado sobre todas las compras registradas">Costo prom.</th>' : ''}
+                <th class="num">Precio</th>${showCost ? '<th class="num">Margen</th>' : ''}
+                <th>Estado</th>${showActions ? '<th></th>' : ''}
               </tr></thead>
               <tbody>
               ${rows.map(p => {
@@ -916,27 +1153,31 @@ function viewProducts() {
                     : '<span class="badge badge-ok">OK</span>';
                 const color = p.current === 0 ? 'var(--danger)' : (p.current < p.minStock ? 'var(--warning)' : 'var(--text)');
                 const currency = store.tenant?.currency || 'COP';
+                const karatLabel = (GOLD_KARATS.find(g => g.k === Number(p.karat)) || {}).label;
+                const oroVal = isJewelry() && Number(p.karat) > 0 ? goldValue(p.current, p.karat) : 0;
                 return `<tr>
                   <td><code>${esc(p.sku)}</code></td>
                   <td style="font-weight:500">${esc(p.name)}</td>
                   <td>${esc(p.category)}</td>
                   <td>${esc(p.unit)}</td>
-                  <td class="num" style="color:${color};font-weight:${p.current<p.minStock?600:400}">${p.current}</td>
-                  <td class="num">${p.minStock}</td>
-                  <td class="num">${hasCost(p) ? formatMoney(costOf(p), currency) : '<span class="text-muted">—</span>'}</td>
+                  ${isJewelry() ? `<td class="num">${Number(p.karat) > 0 ? esc(karatLabel) : '<span class="text-muted">—</span>'}</td>` : ''}
+                  <td class="num" style="color:${color};font-weight:${p.current<p.minStock?600:400}">${fmtQty(p.current)}</td>
+                  <td class="num">${fmtQty(p.minStock)}</td>
+                  ${isJewelry() ? `<td class="num">${oroVal > 0 ? formatMoney(oroVal, currency) : '<span class="text-muted">—</span>'}</td>` : ''}
+                  ${showCost ? `<td class="num">${hasCost(p) ? formatMoney(costOf(p), currency) : '<span class="text-muted">—</span>'}</td>` : ''}
                   <td class="num">${formatMoney(priceOf(p), currency)}</td>
-                  <td class="num">${marginBadge(p)}</td>
+                  ${showCost ? `<td class="num">${marginBadge(p)}</td>` : ''}
                   <td>${status}</td>
-                  <td>
+                  ${showActions ? `<td>
                     <div class="row" style="gap:4px">
                       <button class="btn btn-sm" onclick="openProductForm('${p.id}')">Editar</button>
                       <button class="btn btn-sm" onclick="handleDeleteProduct('${p.id}','${esc(p.name)}')">Eliminar</button>
                     </div>
-                  </td>
+                  </td>` : ''}
                 </tr>`;
               }).join('')}
               </tbody>
-             </table>`}
+             </table>`; })()}
       </div>
     </div>`;
 }
@@ -978,12 +1219,21 @@ function openProductForm(id) {
               </div>
               <div class="field">
                 <label class="required">Unidad</label>
-                <input name="unit" required list="unit-list" value="${esc(editing?.unit || '')}" placeholder="Ej: Kg, Unidad, Litro"/>
-                <datalist id="unit-list">${[...new Set(store.products.map(p => p.unit))].map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+                <input name="unit" id="product-unit" required list="unit-list" value="${esc(editing?.unit || '')}" placeholder="Ej: Kg, Unidad, Litro" oninput="syncQtySteps(this.value)"/>
+                <datalist id="unit-list">${[...new Set([...defaultUnitsListFor(store.tenant?.vertical), ...store.products.map(p => p.unit)])].filter(Boolean).map(u => `<option value="${esc(u)}">`).join('')}</datalist>
+                <div class="hint">Usa <strong>g</strong> o <strong>ct</strong> para medir por peso/quilate (acepta decimales).</div>
               </div>
+              ${isJewelry() ? `
+              <div class="field">
+                <label>Ley / Quilataje</label>
+                <select name="karat">
+                  ${GOLD_KARATS.map(g => `<option value="${g.k}" ${Number(editing?.karat ?? 0) === g.k ? 'selected' : ''}>${g.label}</option>`).join('')}
+                </select>
+                <div class="hint">Define la pureza del oro para valuar la pieza al precio spot.</div>
+              </div>` : ''}
               <div class="field">
                 <label class="required">Stock mínimo</label>
-                <input type="number" min="0" step="1" name="minStock" required value="${editing?.minStock ?? 0}"/>
+                <input type="number" min="0" step="${editing ? qtyStep(editing.unit) : '1'}" name="minStock" id="product-minstock" required value="${editing?.minStock ?? 0}"/>
                 <div class="hint">Dispara alerta si el stock cae bajo este valor.</div>
               </div>
               <div class="field">
@@ -1005,7 +1255,7 @@ function openProductForm(id) {
                    <div class="field" style="grid-column:1/-1;background:var(--primary-soft);padding:12px;border-radius:8px;margin-top:4px">
                     <label>⬇️ Agregar stock rápido</label>
                     <div class="row" style="gap:8px">
-                      <input type="number" min="1" step="1" id="quick-stock-qty" placeholder="Cantidad a ingresar" style="flex:1"/>
+                      <input type="number" min="${qtyMin(editing.unit)}" step="${qtyStep(editing.unit)}" id="quick-stock-qty" placeholder="Cantidad a ingresar (${esc(editing.unit)})" style="flex:1"/>
                       <select id="quick-stock-reason" style="flex:1">
                         <option>Ajuste inicial</option>
                         <option>Compra</option>
@@ -1016,7 +1266,7 @@ function openProductForm(id) {
                     </div>
                     <div class="hint">Queda registrado en el historial con motivo trazable.</div>
                    </div>`
-                : `<div class="field"><label>Stock inicial</label><input type="number" min="0" step="1" name="initialStock" value="0"/><div class="hint">Genera una entrada inicial automática.</div></div>`}
+                : `<div class="field"><label>Stock inicial</label><input type="number" min="0" step="${editing ? qtyStep(editing.unit) : '1'}" name="initialStock" id="product-initialstock" value="0"/><div class="hint">Genera una entrada inicial automática.</div></div>`}
             </div>
           </div>
           <div class="modal-footer">
@@ -1031,6 +1281,15 @@ function openProductForm(id) {
 
 function closeModal() { document.getElementById('modal-root').innerHTML = ''; }
 
+// Ajusta el paso/min de los inputs de cantidad del modal de producto cuando cambia la unidad.
+function syncQtySteps(unit) {
+  const step = qtyStep(unit), min = qtyMin(unit);
+  ['product-minstock','product-initialstock','quick-stock-qty'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.step = step; if (id !== 'product-minstock') el.min = min; }
+  });
+}
+
 function quickAddStock(productId) {
   const qtyEl = document.getElementById('quick-stock-qty');
   const reasonEl = document.getElementById('quick-stock-reason');
@@ -1043,10 +1302,10 @@ function quickAddStock(productId) {
       reason, reference: 'QUICK-' + Date.now().toString(36).slice(-4)
     });
     const p = store.products.find(x => x.id === productId);
-    toast(`+${qty} ${p.unit} de "${p.name}" agregado. Stock: ${stockOf(productId)}`, 'success');
+    toast(`+${fmtQty(qty)} ${p.unit} de "${p.name}" agregado. Stock: ${fmtQty(stockOf(productId))}`, 'success');
     // Keep modal open and refresh just the "Stock actual" input
     const stockInput = document.querySelector('.modal input[disabled]');
-    if (stockInput) stockInput.value = `${stockOf(productId)} ${p.unit}`;
+    if (stockInput) stockInput.value = `${fmtQty(stockOf(productId))} ${p.unit}`;
     if (qtyEl) qtyEl.value = '';
     render(); // refresh the product list underneath so when modal closes, data is fresh
     // Re-open modal because render() cleared it
@@ -1066,6 +1325,7 @@ function submitProduct(e, id) {
     cost: Number(f.cost?.value || 0),
     price: Number(f.price.value),
   };
+  if (f.karat) data.karat = Number(f.karat.value) || 0;
   try {
     if (id) {
       updateProduct(id, data);
@@ -1113,7 +1373,7 @@ function viewStockIn() {
               </div>
               <div class="field">
                 <label class="required">Cantidad</label>
-                <input name="quantity" type="number" min="1" step="1" required value="1"/>
+                <input name="quantity" id="stockin-qty" type="number" min="1" step="1" required value="1"/>
               </div>
               <div class="field">
                 <label>Costo unitario de esta compra</label>
@@ -1125,6 +1385,7 @@ function viewStockIn() {
                 <select name="reason" required>
                   <option value="">Seleccionar…</option>
                   <option>Compra</option>
+                  ${isJewelry() ? `${can('gold_buy') ? '<option>Compra de oro a cliente</option>' : ''}<option>Fundición / refundido</option>` : ''}
                   <option>Devolución de cliente</option>
                   <option>Producción</option>
                   <option>Ajuste por conteo</option>
@@ -1152,7 +1413,7 @@ function viewStockIn() {
               ${recent.map(m => `<tr>
                 <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
                 <td>${esc(productName(m.productId))}</td>
-                <td class="num" style="color:var(--success);font-weight:600">+${m.quantity}</td>
+                <td class="num" style="color:var(--success);font-weight:600">+${fmtQty(m.quantity)}</td>
                 <td>${esc(m.reason)}</td>
               </tr>`).join('')}
               </tbody></table>`}
@@ -1165,12 +1426,24 @@ function updateStockInHint(sel) {
   const p = store.products.find(x => x.id === sel.value);
   const hint = document.getElementById('stockin-hint');
   const costInput = document.getElementById('stockin-unitcost');
+  const qtyInput = document.getElementById('stockin-qty');
   if (!hint) return;
   if (p) {
     const currency = store.tenant?.currency || 'COP';
     const current = costOf(p);
-    hint.innerHTML = `Stock: <strong>${stockOf(p.id)} ${esc(p.unit)}</strong> · Costo actual (${valuationMethodLabel()}): <strong>${formatMoney(current, currency)}</strong>`;
-    if (costInput && Number(costInput.value) === 0 && current > 0) costInput.value = current.toFixed(2);
+    if (qtyInput) { qtyInput.step = qtyStep(p.unit); qtyInput.min = qtyMin(p.unit); }
+    let extra = '';
+    // Compra de oro: sugerir costo por gramo derivado del spot del día.
+    const spot = Number(store.settings?.goldSpotPerGram) || 0;
+    if (isJewelry() && Number(p.karat) > 0 && spot > 0) {
+      const finePerGram = karatPurity(p.karat) * spot;        // valor del oro fino en 1 g de esta ley
+      const suggested = finePerGram * 0.90;                    // se compra al 90% del spot por defecto
+      extra = ` · 🥇 Oro ${p.karat}K: 1 g = <strong>${formatMoney(finePerGram, currency)}</strong> de oro fino · sugerido de compra (90%): <strong>${formatMoney(suggested, currency)}/g</strong>`;
+      if (costInput && Number(costInput.value) === 0) costInput.value = (Math.round(suggested * 100) / 100).toFixed(2);
+    } else if (costInput && Number(costInput.value) === 0 && current > 0) {
+      costInput.value = current.toFixed(2);
+    }
+    hint.innerHTML = `Stock: <strong>${fmtQty(stockOf(p.id))} ${esc(p.unit)}</strong> · Costo actual (${valuationMethodLabel()}): <strong>${formatMoney(current, currency)}</strong>${extra}`;
   } else {
     hint.innerHTML = '';
   }
@@ -1188,7 +1461,8 @@ function submitStockIn(e) {
       unitCost: Number(f.unitCost.value) || undefined,
       reference: f.reference.value || undefined,
     });
-    toast(`Entrada de ${f.quantity.value} unidad(es) registrada.`, 'success');
+    const p = store.products.find(x => x.id === f.productId.value);
+    toast(`Entrada de ${fmtQty(Number(f.quantity.value))} ${esc(p?.unit || 'unidad(es)')} registrada.`, 'success');
     render();
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -1217,13 +1491,13 @@ function viewStockOut() {
                 <label class="required">Producto</label>
                 <select name="productId" required>
                   <option value="">Seleccionar…</option>
-                  ${store.products.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) · stock ${stockOf(p.id)}</option>`).join('')}
+                  ${store.products.map(p => `<option value="${p.id}">${esc(p.name)} (${esc(p.sku)}) · stock ${fmtQty(stockOf(p.id))}</option>`).join('')}
                 </select>
                 <div class="hint" id="stockout-hint"></div>
               </div>
               <div class="field" id="qty-field">
                 <label class="required">Cantidad</label>
-                <input name="quantity" type="number" min="1" step="1" required value="1"/>
+                <input name="quantity" id="stockout-qty" type="number" min="1" step="1" required value="1"/>
                 <div class="error" id="stockout-error" style="display:none"></div>
               </div>
               <div class="field">
@@ -1231,6 +1505,7 @@ function viewStockOut() {
                 <select name="reason" required onchange="toggleStockOutPrice(this.form)">
                   <option value="">Seleccionar…</option>
                   <option>Venta</option>
+                  ${isJewelry() ? '<option>Uso en fabricación de pieza</option>' : ''}
                   <option>Consumo interno</option>
                   <option>Merma / daño</option>
                   <option>Devolución a proveedor</option>
@@ -1264,7 +1539,7 @@ function viewStockOut() {
               ${recent.map(m => `<tr>
                 <td style="white-space:nowrap">${formatDate(m.createdAt)}</td>
                 <td>${esc(productName(m.productId))}</td>
-                <td class="num" style="color:var(--danger);font-weight:600">−${m.quantity}</td>
+                <td class="num" style="color:var(--danger);font-weight:600">−${fmtQty(m.quantity)}</td>
                 <td>${esc(m.reason)}</td>
               </tr>`).join('')}
               </tbody></table>`}
@@ -1287,7 +1562,15 @@ function suggestStockOutPrice(form) {
   const input = document.getElementById('stockout-unitprice');
   if (!input) return;
   const p = store.products.find(x => x.id === form.productId.value);
-  const listPrice = p ? priceOf(p) : 0;
+  if (!p) return;
+  const spot = Number(store.settings?.goldSpotPerGram) || 0;
+  // Venta de oro por gramo: precio sugerido = oro fino contenido en 1 g + 25% de taller/fabricación.
+  if (isJewelry() && Number(p.karat) > 0 && unitAllowsDecimals(p.unit) && spot > 0) {
+    const perGram = karatPurity(p.karat) * spot * 1.25;
+    if (Number(input.value) === 0) input.value = (Math.round(perGram * 100) / 100).toFixed(2);
+    return;
+  }
+  const listPrice = priceOf(p);
   if (Number(input.value) === 0 && listPrice > 0) input.value = listPrice.toFixed(2);
 }
 
@@ -1300,9 +1583,17 @@ function validateOut(form) {
   const btn = document.getElementById('stockout-submit');
   const p = store.products.find(x => x.id === pid);
   const currency = store.tenant?.currency || 'COP';
+  const qtyInput = document.getElementById('stockout-qty');
+  if (p && qtyInput) { qtyInput.step = qtyStep(p.unit); qtyInput.min = qtyMin(p.unit); }
 
+  let goldHint = '';
+  const spot = Number(store.settings?.goldSpotPerGram) || 0;
+  if (p && isJewelry() && Number(p.karat) > 0 && spot > 0) {
+    const finePerGram = karatPurity(p.karat) * spot;
+    goldHint = ` · 🥇 Oro ${p.karat}K: ${formatMoney(finePerGram, currency)}/g de oro fino${qty > 0 && unitAllowsDecimals(p.unit) ? ` · ${fmtQty(qty)} g = <strong>${formatMoney(goldValue(qty, p.karat), currency)}</strong> en oro` : ''}`;
+  }
   if (hint) hint.innerHTML = p
-    ? `Disponible: <strong>${stockOf(p.id)} ${esc(p.unit)}</strong> · Mínimo: ${p.minStock} · Precio de lista: <strong>${formatMoney(priceOf(p), currency)}</strong>`
+    ? `Disponible: <strong>${fmtQty(stockOf(p.id))} ${esc(p.unit)}</strong> · Mínimo: ${fmtQty(p.minStock)} · Precio de lista: <strong>${formatMoney(priceOf(p), currency)}</strong>${goldHint}`
     : '';
 
   if (form.reason?.value === 'Venta') suggestStockOutPrice(form);
@@ -1315,7 +1606,7 @@ function validateOut(form) {
   }
   const available = stockOf(p.id);
   if (qty > available) {
-    if (err) { err.textContent = `Stock insuficiente. Disponible: ${available}.`; err.style.display = 'block'; }
+    if (err) { err.textContent = `Stock insuficiente. Disponible: ${fmtQty(available)}.`; err.style.display = 'block'; }
     if (qtyField) qtyField.classList.add('invalid');
     if (btn) btn.disabled = true;
   } else {
@@ -1340,7 +1631,8 @@ function submitStockOut(e) {
       unitPrice,
       reference: f.reference.value || undefined,
     });
-    toast(`Salida de ${f.quantity.value} unidad(es) registrada.`, 'success');
+    const p = store.products.find(x => x.id === f.productId.value);
+    toast(`Salida de ${fmtQty(Number(f.quantity.value))} ${esc(p?.unit || 'unidad(es)')} registrada.`, 'success');
     render();
   } catch (err) { toast(err.message, 'error'); }
 }
@@ -1414,7 +1706,7 @@ function viewMovements() {
                     <div style="font-size:11px;color:var(--muted)">${esc(productSku(m.productId))}</div>
                   </td>
                   <td><span class="badge ${m.incoming?'badge-ok':'badge-warn'}">${m.typeLabel}</span></td>
-                  <td class="num" style="color:${m.incoming?'var(--success)':'var(--danger)'};font-weight:600">${m.incoming?'+':'−'}${m.quantity}</td>
+                  <td class="num" style="color:${m.incoming?'var(--success)':'var(--danger)'};font-weight:600">${m.incoming?'+':'−'}${fmtQty(m.quantity)}</td>
                   <td class="num">${m.runningBalance}</td>
                   <td>${esc(m.reason)}</td>
                   <td class="text-muted">${esc(m.reference || '—')}</td>
@@ -2568,7 +2860,7 @@ function renderMovementsReport(movements) {
         <div style="font-size:11px;color:var(--muted)">${esc(productSku(m.productId))}</div>
       </td>
       <td><span class="badge ${inc?'badge-ok':'badge-warn'}">${MOVEMENT_LABELS[m.type]}</span></td>
-      <td class="num" style="color:${inc?'var(--success)':'var(--danger)'};font-weight:600">${inc?'+':'−'}${m.quantity}</td>
+      <td class="num" style="color:${inc?'var(--success)':'var(--danger)'};font-weight:600">${inc?'+':'−'}${fmtQty(m.quantity)}</td>
       <td class="num">${unitCell}</td>
       <td class="num">${totalCell}</td>
       <td>${esc(m.reason)}</td>
@@ -2917,6 +3209,7 @@ function viewOnboarding() {
                     : `<table class="table">
                         <thead><tr>
                           <th>SKU</th><th>Nombre</th><th>Categoría</th><th>Unidad</th>
+                          ${selectedV === 'jewelry' ? '<th class="num">Ley</th>' : ''}
                           <th class="num">Mín.</th><th class="num">Stock actual</th><th class="num">Precio venta unit.</th><th></th>
                         </tr></thead>
                         <tbody>
@@ -2926,10 +3219,11 @@ function viewOnboarding() {
                             <td style="font-weight:500">${esc(p.name)}</td>
                             <td>${esc(p.category)}</td>
                             <td>${esc(p.unit)}</td>
-                            <td class="num">${p.minStock}</td>
+                            ${selectedV === 'jewelry' ? `<td class="num">${Number(p.karat) > 0 ? p.karat + 'K' : '—'}</td>` : ''}
+                            <td class="num">${fmtQty(p.minStock)}</td>
                             <td class="num">
-                              <input type="number" min="0" step="1" value="${p.currentStock ?? 0}"
-                                     style="width:72px;text-align:right;padding:4px 6px;font-size:13px"
+                              <input type="number" min="0" step="${qtyStep(p.unit)}" value="${p.currentStock ?? 0}"
+                                     style="width:80px;text-align:right;padding:4px 6px;font-size:13px"
                                      onchange="editCatalogStock(${i}, this.value)"/>
                             </td>
                             <td class="num">${Number(p.price || 0).toFixed(2)}</td>
@@ -2959,8 +3253,13 @@ function viewOnboarding() {
                         <option value="__NEW__">➕ Agregar nueva unidad…</option>
                       </select>
                     </div>
-                    <div class="field"><label>Stock mínimo</label><input id="cf-min" type="number" min="0" step="1" value="5"/></div>
-                    <div class="field"><label>Stock actual</label><input id="cf-cur" type="number" min="0" step="1" value="0"/></div>
+                    ${selectedV === 'jewelry' ? `
+                    <div class="field">
+                      <label>Ley / Quilataje</label>
+                      <select id="cf-karat">${GOLD_KARATS.map(g => `<option value="${g.k}">${g.label}</option>`).join('')}</select>
+                    </div>` : ''}
+                    <div class="field"><label>Stock mínimo</label><input id="cf-min" type="number" min="0" step="0.01" value="5"/></div>
+                    <div class="field"><label>Stock actual</label><input id="cf-cur" type="number" min="0" step="0.01" value="0"/></div>
                     <div class="field"><label>Costo unitario (${esc(d.currency || 'COP')})</label><input id="cf-cost" type="number" min="0" step="0.01" value="0" placeholder="Lo que te cuesta 1 unidad"/></div>
                     <div class="field"><label>Precio de venta unitario (${esc(d.currency || 'COP')})</label><input id="cf-price" type="number" min="0" step="0.01" value="0" placeholder="Precio al que vendes 1 unidad"/></div>
                   </div>
@@ -3460,6 +3759,7 @@ function addCatalogFromFields() {
   const currentStock = Number(document.getElementById('cf-cur')?.value || 0);
   const cost = Number(document.getElementById('cf-cost')?.value || 0);
   const price = Number(document.getElementById('cf-price')?.value || 0);
+  const karatEl = document.getElementById('cf-karat');
 
   if (!sku || !name || !category || !unit) {
     toast('Completa SKU, nombre, categoría y unidad.', 'error'); return;
@@ -3471,8 +3771,10 @@ function addCatalogFromFields() {
   if (list.some(p => p.sku.toLowerCase() === sku.toLowerCase())) {
     toast(`Ya hay un producto con SKU "${sku}".`, 'error'); return;
   }
-  list.push({ sku, name, category, unit,
-    minStock: minStock || 0, currentStock: currentStock || 0, cost: cost || 0, price: price || 0 });
+  const row = { sku, name, category, unit,
+    minStock: minStock || 0, currentStock: currentStock || 0, cost: cost || 0, price: price || 0 };
+  if (karatEl) row.karat = Number(karatEl.value) || 0;
+  list.push(row);
   toast(`"${name}" agregado al catálogo.`, 'success');
   captureOnbFormState();
   render();
@@ -3520,12 +3822,96 @@ function suggestUnit(v)     { return suggestUnits(v)[0] || 'Unidad'; }
 function suggestName(v) {
   return ({
     retail:'Arroz', bakery:'Vainilla', hardware:'Martillo',
-    pharmacy:'Loratadina 10mg', petshop:'Arena sanitaria', other:'Producto X',
+    pharmacy:'Loratadina 10mg', petshop:'Arena sanitaria', jewelry:'Oro 18K', other:'Producto X',
   })[v] || 'Nuevo producto';
 }
 function suggestSku(v, n) {
-  const p = ({ retail:'PRO', bakery:'INS', hardware:'HWR', pharmacy:'MED', petshop:'PET', other:'SKU' })[v] || 'SKU';
+  const p = ({ retail:'PRO', bakery:'INS', hardware:'HWR', pharmacy:'MED', petshop:'PET', jewelry:'ORO', other:'SKU' })[v] || 'SKU';
   return `${p}-${String(n).padStart(3,'0')}`;
+}
+
+// ----- Users view
+function viewUsers() {
+  if (!can('manage_users')) {
+    return `<div class="page"><div class="empty" style="padding:48px"><div class="empty-icon">🔒</div><strong>Sin acceso</strong><div>Tu perfil (${esc(roleLabel(activeUser()?.role))}) no puede gestionar usuarios. Solicítalo a un Propietario.</div></div></div>`;
+  }
+  const me = activeUser();
+  const jewelry = isJewelry();
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Usuarios y permisos</h1>
+          <div class="page-subtitle">${store.users.length} usuario(s) · asigna un perfil a cada persona del equipo</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2>Agregar usuario</h2>
+        <form onsubmit="submitUser(event)">
+          <div class="form-grid">
+            <div class="field"><label class="required">Nombre</label><input name="name" required placeholder="Ej: María Gómez"/></div>
+            <div class="field"><label>Correo</label><input name="email" type="email" placeholder="maria@empresa.com"/></div>
+            <div class="field">
+              <label class="required">Perfil / Rol</label>
+              <select name="role" required>
+                ${Object.entries(ROLES).map(([code,r]) => `<option value="${code}">${r.icon} ${r.name}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="row" style="margin-top:12px;justify-content:flex-end">
+            <button type="submit" class="btn btn-primary">+ Agregar usuario</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <h2>Equipo</h2>
+        <table class="table">
+          <thead><tr><th>Nombre</th><th>Correo</th><th>Perfil</th><th>Activo</th><th></th></tr></thead>
+          <tbody>
+          ${store.users.map(u => `
+            <tr${u.id === me?.id ? ' style="background:var(--primary-soft)"' : ''}>
+              <td style="font-weight:500">${esc(u.name)} ${u.id === me?.id ? '<span class="badge badge-ok">tú</span>' : ''}</td>
+              <td>${esc(u.email || '—')}</td>
+              <td>
+                <select onchange="updateUserRole('${u.id}', this.value)">
+                  ${Object.entries(ROLES).map(([code,r]) => `<option value="${code}" ${u.role===code?'selected':''}>${r.icon} ${r.name}</option>`).join('')}
+                </select>
+              </td>
+              <td>${u.id === (load(LS_ACTIVE,null)) ? '<span class="badge badge-ok">en sesión</span>' : `<button class="btn btn-sm" onclick="switchActiveUser('${u.id}')">Entrar como</button>`}</td>
+              <td><button class="btn btn-sm" onclick="removeUser('${u.id}')">Eliminar</button></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h2>¿Qué puede hacer cada perfil?</h2>
+        <div style="overflow:auto">
+        <table class="table">
+          <thead><tr><th>Permiso</th>${Object.values(ROLES).map(r => `<th class="num" style="font-size:12px">${r.icon}<br>${esc(r.name)}</th>`).join('')}</tr></thead>
+          <tbody>
+          ${Object.entries(PERMISSIONS).filter(([code]) => jewelry || (code !== 'gold_spot' && code !== 'gold_buy')).map(([code,label]) => `
+            <tr${(code==='gold_spot'||code==='gold_buy') ? ' style="background:#fef9e7"' : ''}>
+              <td>${esc(label)}${(code==='gold_spot'||code==='gold_buy') ? ' <span class="badge" style="background:#e8d48a;color:#7a5c00">💍 joyería</span>' : ''}</td>
+              ${Object.values(ROLES).map(r => `<td class="num">${(r.perms==='*'||r.perms.includes(code)) ? '<span style="color:var(--success);font-weight:700">✓</span>' : '<span class="text-muted">—</span>'}</td>`).join('')}
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>
+        <div class="hint" style="margin-top:8px">ℹ️ En esta versión los permisos se aplican en la interfaz. La seguridad real (login con contraseña y validación en servidor) llegará con la integración a Firebase.</div>
+      </div>
+    </div>`;
+}
+function submitUser(e) {
+  e.preventDefault();
+  const f = e.target;
+  try {
+    addUser(f.name.value, f.email.value, f.role.value);
+    toast(`Usuario "${f.name.value.trim()}" agregado.`, 'success');
+    render();
+  } catch (err) { toast(err.message, 'error'); }
 }
 
 // ----- Main render
@@ -3548,10 +3934,18 @@ function render() {
         </div>
         <nav class="nav" id="nav"></nav>
         <div class="sidebar-footer">
+          ${(() => { const au = activeUser(); return `
           <div style="padding:8px 4px;margin-bottom:8px;font-size:11px;color:#94a3b8">
-            <div style="color:#e2e8f0;font-weight:500">${esc(store.user.name)}</div>
-            <div>${esc(store.user.role)}</div>
+            <div style="color:#e2e8f0;font-weight:500">${esc(au?.name || store.user.name)}</div>
+            <div>${esc(au ? roleLabel(au.role) : store.user.role)}</div>
           </div>
+          ${(store.users && store.users.length > 1) ? `
+          <div style="padding:0 4px 8px;font-size:11px;color:#94a3b8">
+            <label style="display:block;margin-bottom:4px">Operar como</label>
+            <select onchange="switchActiveUser(this.value)" style="width:100%;font-size:12px;padding:4px 6px;border-radius:6px">
+              ${store.users.map(u => `<option value="${u.id}" ${u.id===(load(LS_ACTIVE,null))?'selected':''}>${esc(u.name)} — ${ROLES[u.role]?.name || u.role}</option>`).join('')}
+            </select>
+          </div>` : ''}`; })()}
           <div style="display:flex;flex-direction:column;gap:6px">
             <button class="btn btn-primary btn-sm" onclick="startClientDemo()">🆕 Demo con datos del cliente</button>
             <button class="btn btn-sm" onclick="restoreDemo()">↺ Restaurar demo de muestra</button>
@@ -3571,7 +3965,15 @@ function render() {
     'reports':   viewReports,
     'insights':  viewInsights,
     'alerts':    viewAlerts,
+    'users':     viewUsers,
   };
+  // Bloqueo de acceso: si el rol activo no tiene permiso para la vista, redirige al dashboard.
+  const navItem = NAV.find(n => n.path === currentView);
+  if (navItem && navItem.perm && !can(navItem.perm)) {
+    document.getElementById('main').innerHTML = `<div class="page"><div class="empty" style="padding:48px"><div class="empty-icon">🔒</div><strong>Sin acceso a esta sección</strong><div>Tu perfil (${esc(roleLabel(activeUser()?.role))}) no tiene permiso para ver “${esc(navItem.label)}”.</div></div></div>`;
+    renderChat();
+    return;
+  }
   const v = views[currentView] || viewDashboard;
   document.getElementById('main').innerHTML = v();
   renderChat();

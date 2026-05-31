@@ -2880,7 +2880,7 @@ function renderProfitabilityReport(products, movements, currency) {
         <div style="font-size:11px;color:var(--muted)">${esc(r.p.sku)}</div>
       </td>
       <td>${esc(r.p.category)}</td>
-      <td class="num">${r.qty} ${esc(r.p.unit)}</td>
+      <td class="num">${fmtQty(r.qty)} <span class="text-muted" style="font-weight:400">${esc(r.p.unit)}</span></td>
       <td class="num">${r.qty > 0 ? formatMoney(r.avgPrice, currency) : '<span class="text-muted">—</span>'}${priceHint}</td>
       <td class="num">${formatMoney(r.revenue, currency)}</td>
       <td class="num">${r.withCost ? formatMoney(r.cogs, currency) : '<span class="text-muted">—</span>'}</td>
@@ -2978,10 +2978,10 @@ function renderInventoryReport(products, movements, stock, currency) {
       <td><code>${esc(p.sku)}</code></td>
       <td>${esc(p.name)}</td>
       <td>${esc(p.category)}</td>
-      <td class="num"><strong>${s}</strong> ${esc(p.unit)}</td>
-      <td class="num">${p.minStock}</td>
-      <td class="num" style="color:var(--success)">+${mov.in}</td>
-      <td class="num" style="color:var(--danger)">−${mov.out}</td>
+      <td class="num"><strong>${fmtQty(s)}</strong> <span class="text-muted" style="font-weight:400">${esc(p.unit)}</span></td>
+      <td class="num">${fmtQty(p.minStock)} <span class="text-muted">${esc(p.unit)}</span></td>
+      <td class="num" style="color:var(--success)">+${fmtQty(mov.in)} <span class="text-muted" style="font-weight:400">${esc(p.unit)}</span></td>
+      <td class="num" style="color:var(--danger)">−${fmtQty(mov.out)} <span class="text-muted" style="font-weight:400">${esc(p.unit)}</span></td>
       <td class="num">${hasCost(p) ? formatMoney(costOf(p), currency) : '<span class="text-muted">—</span>'}</td>
       <td class="num">${formatMoney(p.price ?? 0, currency)}</td>
       <td class="num">${marginBadge(p)}</td>
@@ -3032,37 +3032,36 @@ function renderMovementsReport(movements) {
 }
 
 function renderCategoryReport(products, movements, stock, currency) {
+  // Una categoría puede agrupar productos con distintas unidades (g, Unidad, ct), por lo que
+  // NO se suman cantidades: se cuentan productos y movimientos, y se totaliza el valor en dinero.
   const by = {};
-  const bucket = c => (by[c] ||= { products:0, units:0, value:0, in:0, out:0 });
+  const bucket = c => (by[c] ||= { products:0, value:0, inMov:0, outMov:0 });
   products.forEach(p => {
     const r = bucket(p.category || '—');
     r.products += 1;
     const s = stock[p.id] ?? 0;
-    r.units += Math.max(0, s);
     r.value += s * (p.price ?? 0);
   });
   movements.forEach(m => {
     const p = store.products.find(pp => pp.id === m.productId);
     if (!p) return;
     const r = bucket(p.category || '—');
-    isIncoming(m.type) ? r.in += m.quantity : r.out += m.quantity;
+    isIncoming(m.type) ? r.inMov++ : r.outMov++;
   });
   const rows = Object.entries(by).sort((a,b) => b[1].value - a[1].value);
   if (rows.length === 0) return `<div class="empty"><div class="empty-icon">🏷️</div><strong>Sin categorías</strong></div>`;
   return `<table class="table"><thead><tr>
     <th>Categoría</th>
     <th class="num">Productos</th>
-    <th class="num">Unidades en stock</th>
-    <th class="num">Entradas</th>
-    <th class="num">Salidas</th>
+    <th class="num" title="Movimientos de entrada (las cantidades no se suman porque mezclan unidades)">Mov. entrada</th>
+    <th class="num" title="Movimientos de salida">Mov. salida</th>
     <th class="num">Valor total</th>
   </tr></thead><tbody>
   ${rows.map(([c, r]) => `<tr>
     <td><strong>${esc(c)}</strong></td>
     <td class="num">${r.products}</td>
-    <td class="num">${r.units}</td>
-    <td class="num" style="color:var(--success)">+${r.in}</td>
-    <td class="num" style="color:var(--danger)">−${r.out}</td>
+    <td class="num" style="color:var(--success)">${r.inMov}</td>
+    <td class="num" style="color:var(--danger)">${r.outMov}</td>
     <td class="num"><strong>${formatMoney(r.value, currency)}</strong></td>
   </tr>`).join('')}
   </tbody></table>`;
@@ -3097,10 +3096,10 @@ function renderTopProductsReport(products, movements, stock) {
         <div style="font-size:11px;color:var(--muted)">${esc(r.p.sku)}</div>
       </td>
       <td>${esc(r.p.category)}</td>
-      <td class="num">${r.stock} ${esc(r.p.unit)}</td>
-      <td class="num" style="color:var(--success)">+${r.in}</td>
-      <td class="num" style="color:var(--danger)">−${r.out}</td>
-      <td class="num"><strong>${r.total}</strong></td>
+      <td class="num">${fmtQty(r.stock)} <span class="text-muted">${esc(r.p.unit)}</span></td>
+      <td class="num" style="color:var(--success)">+${fmtQty(r.in)} <span class="text-muted" style="font-weight:400">${esc(r.p.unit)}</span></td>
+      <td class="num" style="color:var(--danger)">−${fmtQty(r.out)} <span class="text-muted" style="font-weight:400">${esc(r.p.unit)}</span></td>
+      <td class="num"><strong>${fmtQty(r.total)}</strong> <span class="text-muted" style="font-weight:400">${esc(r.p.unit)}</span></td>
       <td><div class="coverage-bar" style="width:140px"><div class="coverage-fill" style="width:${pct}%;background:var(--primary)"></div></div></td>
     </tr>`;
   }).join('')}

@@ -5,54 +5,75 @@
 <title>Inventra AI · Demo</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text x='0' y='13' font-size='14'>📦</text></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg:#0f172a; --surface:#fff; --surface-2:#f8fafc; --surface-3:#f1f5f9;
-  --border:#e2e8f0; --text:#0f172a; --muted:#64748b;
-  --primary:#2563eb; --primary-hover:#1d4ed8; --primary-soft:#eff6ff;
-  --success:#16a34a; --success-soft:#dcfce7;
+  --bg:#0f172a; --surface:#fff; --surface-2:#f6f8fb; --surface-3:#eef2f7;
+  --border:#e4e9f0; --border-strong:#d4dbe6; --text:#0f1b2d; --muted:#64748b;
+  --primary:#2563eb; --primary-hover:#1d4ed8; --primary-soft:#eef4ff; --primary-deep:#1e40af;
+  --success:#15a34a; --success-soft:#dcfce7;
   --warning:#d97706; --warning-soft:#fef3c7;
   --danger:#dc2626;  --danger-soft:#fee2e2;
-  --radius:8px; --radius-lg:12px;
-  --shadow-sm:0 1px 2px rgba(15,23,42,.06); --shadow:0 4px 12px rgba(15,23,42,.08);
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --radius:9px; --radius-lg:14px; --radius-xl:20px;
+  --shadow-sm:0 1px 2px rgba(16,30,54,.06), 0 1px 1px rgba(16,30,54,.04);
+  --shadow:0 6px 20px -6px rgba(16,30,54,.14), 0 2px 6px -2px rgba(16,30,54,.08);
+  --shadow-lg:0 20px 48px -12px rgba(16,30,54,.22), 0 8px 20px -8px rgba(16,30,54,.12);
+  --ring:0 0 0 3px var(--primary-soft);
+  --ease:cubic-bezier(.32,.72,.28,1);
+  --font-display:"Sora",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --font-body:"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  font-family:var(--font-body);
 }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--surface-2);color:var(--text);font-size:14px;line-height:1.5}
+body{
+  background:var(--surface-2);color:var(--text);font-size:14px;line-height:1.5;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;
+  background-image:
+    radial-gradient(900px 500px at 100% -5%, rgba(37,99,235,.05), transparent 60%),
+    radial-gradient(700px 460px at -10% 110%, rgba(37,99,235,.04), transparent 55%);
+  background-attachment:fixed;
+}
+@media (prefers-reduced-motion: reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}}
 a{color:var(--primary);text-decoration:none}
 a:hover{text-decoration:underline}
-h1,h2,h3{margin:0 0 12px;font-weight:600}
+h1,h2,h3{margin:0 0 12px;font-weight:700;font-family:var(--font-display);letter-spacing:-.01em}
 h1{font-size:22px} h2{font-size:18px} h3{font-size:16px}
 code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:var(--surface-3);padding:1px 6px;border-radius:4px}
 
 /* shell */
 .shell{display:flex;min-height:100vh}
-.sidebar{width:240px;min-width:240px;background:#0f172a;color:#e2e8f0;display:flex;flex-direction:column;height:100vh;position:sticky;top:0}
-.brand{display:flex;gap:10px;align-items:center;padding:20px 16px;border-bottom:1px solid #1e293b}
-.brand-icon{font-size:24px}
-.brand-title{font-weight:700;font-size:15px}
+.sidebar{width:244px;min-width:244px;background:linear-gradient(185deg,#101a2e 0%,#0b1322 100%);color:#e2e8f0;display:flex;flex-direction:column;height:100vh;position:sticky;top:0;border-right:1px solid rgba(255,255,255,.04)}
+.brand{display:flex;gap:11px;align-items:center;padding:20px 16px;border-bottom:1px solid rgba(255,255,255,.06)}
+.brand-icon{font-size:24px;filter:drop-shadow(0 2px 6px rgba(37,99,235,.5))}
+.brand-title{font-weight:700;font-size:15px;font-family:var(--font-display);letter-spacing:-.01em}
 .brand-sub{font-size:11px;color:#94a3b8}
-.nav{display:flex;flex-direction:column;gap:2px;padding:16px 8px;flex:1}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;color:#cbd5e1;cursor:pointer;font-size:14px;position:relative;user-select:none}
-.nav-item:hover{background:#1e293b;color:#fff}
-.nav-item.active{background:#2563eb;color:#fff;font-weight:500}
-.nav-icon{width:18px;text-align:center}
+.nav{display:flex;flex-direction:column;gap:3px;padding:16px 10px;flex:1}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:9px;color:#aeb9cc;cursor:pointer;font-size:13.5px;font-weight:500;position:relative;user-select:none;transition:background 180ms var(--ease),color 180ms var(--ease),transform 120ms var(--ease)}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item:active{transform:scale(.985)}
+.nav-item.active{background:linear-gradient(100deg,#2563eb,#1d4ed8);color:#fff;font-weight:600;box-shadow:0 6px 16px -6px rgba(37,99,235,.7)}
+.nav-item.active::before{content:"";position:absolute;left:-10px;top:50%;transform:translateY(-50%);width:3px;height:18px;background:#fff;border-radius:0 3px 3px 0}
+.nav-icon{width:18px;text-align:center;font-size:15px}
 .nav-label{flex:1}
-.nav-badge{background:#dc2626;color:#fff;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600}
+.nav-badge{background:#dc2626;color:#fff;font-size:11px;padding:1px 7px;border-radius:999px;font-weight:600;box-shadow:0 2px 6px rgba(220,38,38,.45)}
 .sidebar-footer{padding:12px;border-top:1px solid #1e293b}
 .sidebar-footer .btn{width:100%;color:#cbd5e1;background:transparent;border-color:transparent}
 .sidebar-footer .btn:hover{background:#1e293b;color:#fff}
 .main{flex:1;overflow-x:auto}
 
 /* page */
-.page{padding:24px 32px;max-width:1400px}
+.page{padding:26px 34px;max-width:1400px;animation:pageIn .4s var(--ease)}
+@keyframes pageIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-.page-title{font-size:22px;font-weight:600;margin:0}
-.page-subtitle{color:var(--muted);font-size:13px;margin-top:2px}
+.page-title{font-size:23px;font-weight:700;margin:0;font-family:var(--font-display);letter-spacing:-.02em}
+.page-subtitle{color:var(--muted);font-size:13px;margin-top:3px}
 
 /* card */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);transition:box-shadow 220ms var(--ease),border-color 220ms var(--ease)}
+.card:hover{box-shadow:var(--shadow);border-color:var(--border-strong)}
 .card + .card{margin-top:16px}
 
 /* grid */
@@ -64,33 +85,43 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;back
 .spacer{flex:1}
 
 /* button */
-.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--border);font-size:14px;font-weight:500;cursor:pointer;transition:all 150ms;background:var(--surface);color:var(--text);font-family:inherit}
-.btn:hover:not(:disabled){background:var(--surface-3)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:9px 16px;border-radius:var(--radius);border:1px solid var(--border-strong);font-size:13.5px;font-weight:600;cursor:pointer;transition:background 160ms var(--ease),border-color 160ms var(--ease),transform 100ms var(--ease),box-shadow 160ms var(--ease);background:var(--surface);color:var(--text);font-family:inherit;box-shadow:var(--shadow-sm)}
+.btn:hover:not(:disabled){background:var(--surface-3);border-color:var(--muted)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.99)}
+.btn:focus-visible{outline:none;box-shadow:var(--ring)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
-.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
-.btn-primary:hover:not(:disabled){background:var(--primary-hover);border-color:var(--primary-hover)}
-.btn-sm{padding:6px 10px;font-size:12px}
+.btn-primary{background:linear-gradient(180deg,#3b82f6,var(--primary));color:#fff;border-color:var(--primary-deep);box-shadow:0 4px 12px -4px rgba(37,99,235,.6),inset 0 1px 0 rgba(255,255,255,.18)}
+.btn-primary:hover:not(:disabled){background:linear-gradient(180deg,#2f7bf4,var(--primary-hover));border-color:var(--primary-deep)}
+.btn-sm{padding:6px 11px;font-size:12px;border-radius:7px}
 
 /* form */
 .form-grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
 .field{display:flex;flex-direction:column;gap:6px}
 .field label{font-size:13px;font-weight:500}
 .field .required::after{content:" *";color:var(--danger)}
-.field input,.field select,.field textarea{padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text);font-family:inherit}
-.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+.field input,.field select,.field textarea{padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);font-size:14px;background:var(--surface);color:var(--text);font-family:inherit;transition:border-color 150ms var(--ease),box-shadow 150ms var(--ease),background 150ms var(--ease)}
+.field input:hover,.field select:hover,.field textarea:hover{border-color:var(--muted)}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--primary);box-shadow:var(--ring)}
 .field.invalid input,.field.invalid select{border-color:var(--danger)}
 .field .error{color:var(--danger);font-size:12px}
 .field .hint{color:var(--muted);font-size:12px}
 
 /* table */
 .table{width:100%;border-collapse:collapse}
-.table th,.table td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);font-size:13px}
-.table th{font-weight:600;color:var(--muted);background:var(--surface-2);font-size:12px;text-transform:uppercase;letter-spacing:.02em}
-.table tbody tr:hover{background:var(--surface-2)}
-.table td.num{text-align:right;font-variant-numeric:tabular-nums}
+.table th,.table td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border);font-size:13px}
+.table th{font-weight:600;color:var(--muted);background:var(--surface-2);font-size:11px;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;z-index:1}
+.table thead th:first-child{border-top-left-radius:8px}
+.table thead th:last-child{border-top-right-radius:8px}
+.table tbody tr{transition:background 130ms var(--ease)}
+.table tbody tr:hover{background:var(--primary-soft)}
+.table tbody tr:last-child td{border-bottom:none}
+.table td.num{text-align:right;font-variant-numeric:tabular-nums;font-feature-settings:"tnum"}
 
 /* badges */
-.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600;border:1px solid transparent}
+.badge-ok{border-color:rgba(21,163,74,.2)}
+.badge-warn{border-color:rgba(217,119,6,.22)}
+.badge-danger{border-color:rgba(220,38,38,.2)}
 .badge-ok{background:var(--success-soft);color:var(--success)}
 .badge-warn{background:var(--warning-soft);color:var(--warning)}
 .badge-danger{background:var(--danger-soft);color:var(--danger)}
@@ -99,33 +130,51 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;back
 
 /* toasts */
 .toast-container{position:fixed;top:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:9999}
-.toast{background:var(--surface);border:1px solid var(--border);border-left-width:4px;padding:12px 16px;border-radius:var(--radius);box-shadow:var(--shadow);min-width:260px;animation:slideIn 200ms ease-out}
+.toast{background:var(--surface);border:1px solid var(--border);border-left-width:4px;padding:13px 16px;border-radius:var(--radius);box-shadow:var(--shadow-lg);min-width:260px;max-width:360px;font-size:13px;animation:slideIn 320ms var(--ease)}
 .toast.success{border-left-color:var(--success)}
 .toast.error{border-left-color:var(--danger)}
 .toast.info{border-left-color:var(--primary)}
-@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:none;opacity:1}}
+@keyframes slideIn{from{transform:translateX(120%) scale(.96);opacity:0}to{transform:none;opacity:1}}
 
 /* empty */
-.empty{text-align:center;padding:40px 20px;color:var(--muted)}
-.empty-icon{font-size:32px;margin-bottom:8px}
+.empty{text-align:center;padding:44px 20px;color:var(--muted)}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:.85;filter:grayscale(.1)}
+.empty strong{display:block;color:var(--text);font-family:var(--font-display);margin-bottom:4px}
 
 /* stat */
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm)}
-.stat-label{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;font-weight:600;margin-bottom:8px}
-.stat-value{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;box-shadow:var(--shadow-sm);transition:transform 220ms var(--ease),box-shadow 220ms var(--ease),border-color 220ms var(--ease);position:relative;overflow:hidden}
+.stat-card:hover{transform:translateY(-3px);box-shadow:var(--shadow);border-color:var(--border-strong)}
+.stat-label{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px}
+.stat-value{font-size:29px;font-weight:700;font-variant-numeric:tabular-nums;font-family:var(--font-display);letter-spacing:-.02em}
 .stat-hint{color:var(--muted);font-size:12px;margin-top:4px}
 .stat-card.alert{border-left:4px solid var(--danger)}
 .stat-card.ok{border-left:4px solid var(--success)}
 
 /* modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px}
-.modal{background:var(--surface);border-radius:var(--radius-lg);box-shadow:0 20px 60px rgba(15,23,42,.3);max-width:720px;width:100%;max-height:90vh;overflow:auto}
+.modal-overlay{position:fixed;inset:0;background:rgba(11,19,34,.55);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000;padding:24px;animation:fadeIn 200ms var(--ease)}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal{background:var(--surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);max-width:720px;width:100%;max-height:90vh;overflow:auto;animation:modalIn 320ms var(--ease)}
+@keyframes modalIn{from{opacity:0;transform:translateY(16px) scale(.97)}to{opacity:1;transform:none}}
 .modal-header{padding:20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
 .modal-header h2{margin:0}
 .modal-body{padding:20px}
 .modal-footer{padding:16px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
 .close-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:4px}
 .close-x:hover{background:var(--surface-3)}
+
+/* entrada escalonada de tarjetas (primer plano del dashboard) */
+.grid-4 > *{animation:cardRise .5s var(--ease) backwards}
+.grid-4 > *:nth-child(1){animation-delay:.04s}
+.grid-4 > *:nth-child(2){animation-delay:.10s}
+.grid-4 > *:nth-child(3){animation-delay:.16s}
+.grid-4 > *:nth-child(4){animation-delay:.22s}
+@keyframes cardRise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* scrollbar refinado */
+*{scrollbar-width:thin;scrollbar-color:var(--border-strong) transparent}
+*::-webkit-scrollbar{width:10px;height:10px}
+*::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:999px;border:2px solid var(--surface-2)}
+*::-webkit-scrollbar-thumb:hover{background:var(--muted)}
 
 /* utilities */
 .mt-12{margin-top:12px} .mt-16{margin-top:16px} .mt-20{margin-top:20px}
@@ -154,10 +203,12 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;back
 
 /* vertical selector */
 .vertical-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:8px}
-.vertical-card{background:var(--surface);border:2px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;text-align:center;transition:all 150ms}
-.vertical-card:hover{border-color:var(--primary);background:var(--primary-soft)}
-.vertical-card.selected{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 0 0 3px rgba(37,99,235,.15)}
-.vertical-icon{font-size:28px;margin-bottom:4px}
+.vertical-card{background:var(--surface);border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:transform 180ms var(--ease),border-color 180ms var(--ease),background 180ms var(--ease),box-shadow 180ms var(--ease)}
+.vertical-card:hover{border-color:var(--primary);background:var(--primary-soft);transform:translateY(-3px);box-shadow:var(--shadow)}
+.vertical-card.selected{border-color:var(--primary);background:var(--primary-soft);box-shadow:0 0 0 3px rgba(37,99,235,.18),var(--shadow)}
+.vertical-card:active{transform:translateY(-1px) scale(.99)}
+.vertical-icon{font-size:30px;margin-bottom:5px;transition:transform 180ms var(--ease)}
+.vertical-card:hover .vertical-icon{transform:scale(1.12)}
 .vertical-name{font-weight:500;font-size:13px}
 
 /* welcome */
@@ -175,8 +226,9 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;back
 .summary-section-title{font-size:12px;text-transform:uppercase;color:var(--muted);letter-spacing:.05em;font-weight:600;margin-bottom:8px}
 
 /* ai / chat / insights */
-.fab{position:fixed;right:24px;bottom:24px;width:56px;height:56px;border-radius:50%;background:var(--primary);color:#fff;border:none;box-shadow:0 10px 24px rgba(37,99,235,.4);cursor:pointer;font-size:24px;z-index:500;display:flex;align-items:center;justify-content:center;transition:transform 150ms}
-.fab:hover{transform:scale(1.08);background:var(--primary-hover)}
+.fab{position:fixed;right:24px;bottom:24px;width:58px;height:58px;border-radius:50%;background:linear-gradient(150deg,#3b82f6,var(--primary-hover));color:#fff;border:none;box-shadow:0 14px 30px -8px rgba(37,99,235,.65),inset 0 1px 0 rgba(255,255,255,.25);cursor:pointer;font-size:24px;z-index:500;display:flex;align-items:center;justify-content:center;transition:transform 220ms var(--ease),box-shadow 220ms var(--ease)}
+.fab:hover{transform:scale(1.1) rotate(4deg);box-shadow:0 18px 38px -8px rgba(37,99,235,.75)}
+.fab:active{transform:scale(1.02)}
 .chat-drawer{position:fixed;right:24px;bottom:24px;width:380px;max-width:calc(100vw - 48px);height:580px;max-height:calc(100vh - 48px);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:0 24px 60px rgba(15,23,42,.3);display:flex;flex-direction:column;z-index:600;overflow:hidden}
 .chat-header{padding:14px 16px;background:var(--primary);color:#fff;display:flex;justify-content:space-between;align-items:center}
 .chat-header .close-x{color:#fff}
@@ -439,13 +491,62 @@ function updateGoldSpot(value) {
   if (!store.settings) store.settings = {};
   store.settings.goldSpotPerGram = isNaN(v) || v < 0 ? 0 : v;
   store.settings.goldSpotUpdatedAt = new Date().toISOString();
+  store.settings.goldSpotSource = 'manual';
   save(LS_SETTINGS, store.settings);
   render();
+}
+
+const TROY_OUNCE_GRAMS = 31.1035; // 1 onza troy = 31.1035 g
+
+// Trae el precio spot del oro del día desde fuentes públicas gratuitas (solo demo).
+// Oro en USD/onza troy → convierte a la moneda del tenant por gramo de oro fino (24K).
+// PRODUCCIÓN: mover al backend con una API profesional con key (ver memoria del proyecto).
+async function fetchGoldSpot() {
+  if (!can('gold_spot')) { toast('Tu perfil no puede editar la cotización del oro.', 'error'); return; }
+  const btn = document.getElementById('gold-fetch-btn');
+  const currency = store.tenant?.currency || 'COP';
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Consultando…'; }
+  try {
+    // 1) Precio del oro en USD por onza troy.
+    const goldRes = await fetch('https://api.gold-api.com/price/XAU');
+    if (!goldRes.ok) throw new Error('No se pudo obtener el precio del oro.');
+    const gold = await goldRes.json();
+    const usdPerOunce = Number(gold.price);
+    if (!usdPerOunce) throw new Error('Respuesta de precio inválida.');
+
+    // 2) Tasa de cambio USD → moneda del tenant (si no es USD).
+    let rate = 1;
+    if (currency !== 'USD') {
+      const fxRes = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (!fxRes.ok) throw new Error('No se pudo obtener la tasa de cambio.');
+      const fx = await fxRes.json();
+      rate = Number(fx?.rates?.[currency]);
+      if (!rate) throw new Error(`No hay tasa de cambio para ${currency}.`);
+    }
+
+    // 3) COP (u otra moneda) por gramo de oro fino.
+    const perGramFine = (usdPerOunce / TROY_OUNCE_GRAMS) * rate;
+    const rounded = Math.round(perGramFine);
+
+    if (!store.settings) store.settings = {};
+    store.settings.goldSpotPerGram = rounded;
+    store.settings.goldSpotUpdatedAt = new Date().toISOString();
+    store.settings.goldSpotSource = 'auto';
+    save(LS_SETTINGS, store.settings);
+    render();
+    toast(`Cotización actualizada: ${formatMoney(rounded, currency)}/g (oro fino, ${usdPerOunce.toLocaleString('en-US')} USD/oz).`, 'success');
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Traer precio del día'; }
+    toast(`No se pudo traer la cotización: ${e.message} Puedes ingresarla manualmente.`, 'error');
+  }
 }
 // Tarjeta de cotización del oro para el dashboard de joyería.
 function goldSpotCard(currency) {
   const spot = Number(store.settings?.goldSpotPerGram) || 0;
   const updated = store.settings?.goldSpotUpdatedAt ? formatDate(store.settings.goldSpotUpdatedAt) : 'nunca';
+  const source = store.settings?.goldSpotSource;
+  const sourceBadge = source === 'auto' ? ' · <span style="background:#d4edda;color:#155724;padding:1px 6px;border-radius:8px;font-size:10px">🌐 automático</span>'
+                    : source === 'manual' ? ' · <span style="background:#e8d48a;color:#7a5c00;padding:1px 6px;border-radius:8px;font-size:10px">✎ manual</span>' : '';
   const fineGrams = totalFineGrams();
   return `
     <div class="card" style="background:linear-gradient(135deg,#fef9e7,#fdf2d0);border:1px solid #e8d48a;margin-bottom:16px">
@@ -453,14 +554,19 @@ function goldSpotCard(currency) {
         <div style="font-size:32px">🥇</div>
         <div style="flex:1;min-width:220px">
           <div style="font-weight:700;color:#7a5c00">Cotización del oro (precio spot)</div>
-          <div class="hint" style="color:#8a6d1f">Precio del gramo de oro fino (24K). Actualízalo con la cotización del día — sirve para valuar todo el inventario y sugerir precios de compra/venta.</div>
+          <div class="hint" style="color:#8a6d1f">Precio del gramo de oro fino (24K). Tráelo del día con un clic o ingrésalo manual — sirve para valuar el inventario y sugerir precios de compra/venta.</div>
         </div>
         <div class="field" style="min-width:200px">
           <label style="color:#7a5c00">Precio por gramo fino (${esc(currency)})</label>
           <input type="number" min="0" step="0.01" value="${spot || ''}" placeholder="Ej: 300000"
                  ${can('gold_spot') ? `onchange="updateGoldSpot(this.value)"` : 'disabled title="Tu perfil no puede editar la cotización"'} style="font-weight:600"/>
-          <div class="hint" style="color:#8a6d1f">Última actualización: ${updated}${can('gold_spot') ? '' : ' · 🔒 solo Admin/Gerente'}</div>
+          <div class="hint" style="color:#8a6d1f">Actualizado: ${updated}${sourceBadge}${can('gold_spot') ? '' : ' · 🔒 solo Admin/Gerente'}</div>
         </div>
+        ${can('gold_spot') ? `
+        <div style="min-width:170px">
+          <button id="gold-fetch-btn" class="btn btn-primary" onclick="fetchGoldSpot()" style="width:100%">🔄 Traer precio del día</button>
+          <div class="hint" style="color:#8a6d1f;text-align:center;margin-top:4px">Cotización internacional</div>
+        </div>` : ''}
         <div style="text-align:right;min-width:160px">
           <div class="stat-label" style="color:#7a5c00">Oro fino en inventario</div>
           <div style="font-size:20px;font-weight:700;color:#7a5c00">${fmtQty(Math.round(fineGrams * 100) / 100)} g</div>

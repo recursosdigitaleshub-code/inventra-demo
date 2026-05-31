@@ -1,0 +1,8 @@
+/node_modules
+/dist
+/out-tsc
+/.angular
+.DS_Store
+*.log
+.env
+.mcp.json

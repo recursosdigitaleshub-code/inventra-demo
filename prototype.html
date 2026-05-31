@@ -489,6 +489,21 @@ function goldValue(grams, karat) {
 }
 function isJewelry() { return store.tenant?.vertical === 'jewelry'; }
 
+// Valor de `qty` unidades de un producto para valuar inventario. Orden de preferencia:
+//   1) precio de lista (stock × precio);
+//   2) en joyería con ley de oro: valor del oro al spot del día;
+//   3) respaldo: costo promedio (WAC) — así el inventario no queda en 0 si hay costo cargado.
+function productValue(p, qty) {
+  const q = Number(qty) || 0;
+  const byPrice = q * (Number(p.price) || 0);
+  if (byPrice > 0) return byPrice;
+  if (isJewelry() && Number(p.karat) > 0) {
+    const byGold = goldValue(q, p.karat);
+    if (byGold > 0) return byGold;
+  }
+  return q * (costOf(p) || 0); // respaldo por costo
+}
+
 // Valor total del oro contenido en el inventario, al precio spot configurado.
 function totalGoldValue() {
   const stock = stockByProduct();
@@ -2713,7 +2728,7 @@ function viewReports() {
   let inCount = 0, outCount = 0;
   filteredMovements.forEach(m => { isIncoming(m.type) ? inCount++ : outCount++; });
   const totalUnitsFiltered = filteredProducts.reduce((s,p) => s + Math.max(0, stock[p.id] ?? 0), 0);
-  const inventoryValue     = filteredProducts.reduce((s,p) => s + (stock[p.id] ?? 0) * (p.price ?? 0), 0);
+  const inventoryValue     = filteredProducts.reduce((s,p) => s + productValue(p, stock[p.id] ?? 0), 0);
 
   return `
     <div class="page">
@@ -2973,7 +2988,7 @@ function renderInventoryReport(products, movements, stock, currency) {
     const s = stock[p.id] ?? 0;
     const mov = movByProduct[p.id] || { in:0, out:0 };
     const below = s < p.minStock;
-    const value = s * (p.price ?? 0);
+    const value = productValue(p, s);
     return `<tr>
       <td><code>${esc(p.sku)}</code></td>
       <td>${esc(p.name)}</td>
@@ -3040,7 +3055,7 @@ function renderCategoryReport(products, movements, stock, currency) {
     const r = bucket(p.category || '—');
     r.products += 1;
     const s = stock[p.id] ?? 0;
-    r.value += s * (p.price ?? 0);
+    r.value += productValue(p, s);
   });
   movements.forEach(m => {
     const p = store.products.find(pp => pp.id === m.productId);
@@ -3135,23 +3150,21 @@ function exportReportCsv() {
     filename = 'inventra-movimientos.csv';
   } else if (reportTab === 'by-category') {
     const by = {};
-    const bucket = c => (by[c] ||= { products:0, units:0, value:0, in:0, out:0 });
+    const bucket = c => (by[c] ||= { products:0, value:0, inMov:0, outMov:0 });
     filteredProducts.forEach(p => {
       const r = bucket(p.category || '—');
       r.products += 1;
-      const s = stock[p.id] ?? 0;
-      r.units += Math.max(0, s);
-      r.value += s * (p.price ?? 0);
+      r.value += productValue(p, stock[p.id] ?? 0);
     });
     filteredMovements.forEach(m => {
       const p = store.products.find(pp => pp.id === m.productId);
       if (!p) return;
       const r = bucket(p.category || '—');
-      isIncoming(m.type) ? r.in += m.quantity : r.out += m.quantity;
+      isIncoming(m.type) ? r.inMov++ : r.outMov++;
     });
-    rows = [['Categoría','Productos','Unidades','Entradas','Salidas','Valor total']];
+    rows = [['Categoría','Productos','Mov. entrada','Mov. salida','Valor total']];
     Object.entries(by).sort((a,b) => b[1].value - a[1].value).forEach(([c, r]) => {
-      rows.push([c, r.products, r.units, r.in, r.out, Math.round(r.value)]);
+      rows.push([c, r.products, r.inMov, r.outMov, Math.round(r.value)]);
     });
     filename = 'inventra-por-categoria.csv';
   } else if (reportTab === 'top-products') {
@@ -3206,7 +3219,7 @@ function exportReportCsv() {
     filteredProducts.forEach(p => {
       const s = stock[p.id] ?? 0;
       const mov = movByProduct[p.id] || { in:0, out:0 };
-      rows.push([p.sku, p.name, p.category, p.unit, s, p.minStock, mov.in, mov.out, p.price ?? 0, Math.round(s * (p.price ?? 0))]);
+      rows.push([p.sku, p.name, p.category, p.unit, s, p.minStock, mov.in, mov.out, p.price ?? 0, Math.round(productValue(p, s))]);
     });
     filename = 'inventra-inventario.csv';
   }

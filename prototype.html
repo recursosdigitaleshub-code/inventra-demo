@@ -573,6 +573,22 @@ function goldSpotCard(currency) {
           <div class="hint" style="color:#8a6d1f">${spot > 0 ? '≈ ' + formatMoney(totalGoldValue(), currency) : 'Configura el spot para valuar'}</div>
         </div>
       </div>
+      <div style="border-top:1px solid #e8d48a;margin-top:14px;padding-top:14px;display:flex;gap:24px;flex-wrap:wrap;align-items:flex-end">
+        <div style="color:#7a5c00;font-size:12px;font-weight:600;align-self:center">⚙️ Política de precios</div>
+        <div class="field" style="min-width:150px;flex:0 0 auto">
+          <label style="color:#7a5c00">% de compra de oro</label>
+          <input type="number" min="0" max="100" step="0.5" value="${fmtQty(goldBuyPct())}"
+                 ${can('gold_spot') ? `onchange="updateGoldPct('goldBuyPct', this.value)"` : 'disabled'} style="width:110px"/>
+          <div class="hint" style="color:#8a6d1f">Cuánto del spot pagas al cliente al comprar oro usado.</div>
+        </div>
+        <div class="field" style="min-width:150px;flex:0 0 auto">
+          <label style="color:#7a5c00">% de margen de venta</label>
+          <input type="number" min="0" step="0.5" value="${fmtQty(goldSellPct())}"
+                 ${can('gold_spot') ? `onchange="updateGoldPct('goldSellPct', this.value)"` : 'disabled'} style="width:110px"/>
+          <div class="hint" style="color:#8a6d1f">Margen de taller que sumas sobre el oro al vender.</div>
+        </div>
+        ${!can('gold_spot') ? '<div class="hint" style="color:#8a6d1f;align-self:center">🔒 solo Admin/Gerente</div>' : ''}
+      </div>
     </div>`;
 }
 
@@ -580,16 +596,30 @@ function goldSpotCard(currency) {
 // En joyería el precio de una pieza de oro se deriva del peso, la ley y el spot del día,
 // más un margen de taller/fabricación. Estas funciones sugieren precios y calculan totales.
 //
+// Los porcentajes son CONFIGURABLES por empresa (cada joyería tiene su política comercial).
+// Valores por defecto: compra 90% del spot, venta +25% de margen de taller.
+const GOLD_BUY_PCT_DEFAULT = 90;   // % del spot que se paga al comprar oro al cliente
+const GOLD_SELL_PCT_DEFAULT = 25;  // % de margen de taller que se suma al vender
+function goldBuyPct()  { const v = Number(store.settings?.goldBuyPct);  return isNaN(v) || v <= 0 ? GOLD_BUY_PCT_DEFAULT  : v; }
+function goldSellPct() { const v = Number(store.settings?.goldSellPct); return isNaN(v) || v < 0 ? GOLD_SELL_PCT_DEFAULT : v; }
+
 // Precio de COMPRA de oro a cliente (compra de oro usado / chatarra):
-//   normalmente se paga un % del valor spot del oro fino contenido (la joyería gana en el descuento).
-function suggestGoldBuyPrice(grams, karat, pctOfSpot = 0.90) {
-  return goldValue(grams, karat) * pctOfSpot;
+//   se paga un % del valor spot del oro fino contenido (la joyería gana en el descuento).
+function suggestGoldBuyPrice(grams, karat, pct = goldBuyPct()) {
+  return goldValue(grams, karat) * (pct / 100);
 }
 // Precio de VENTA de una pieza de oro:
 //   valor del oro fino contenido + margen de fabricación/taller (% sobre el oro).
-function suggestGoldSellPrice(grams, karat, makingPct = 0.25) {
-  const base = goldValue(grams, karat);
-  return base * (1 + makingPct);
+function suggestGoldSellPrice(grams, karat, makingPct = goldSellPct()) {
+  return goldValue(grams, karat) * (1 + makingPct / 100);
+}
+function updateGoldPct(field, value) {
+  if (!can('gold_spot')) { toast('Tu perfil no puede editar los parámetros del oro.', 'error'); return; }
+  const v = Number(value);
+  if (!store.settings) store.settings = {};
+  store.settings[field] = isNaN(v) || v < 0 ? (field === 'goldBuyPct' ? GOLD_BUY_PCT_DEFAULT : GOLD_SELL_PCT_DEFAULT) : v;
+  save(LS_SETTINGS, store.settings);
+  render();
 }
 
 const CURRENCIES = ['COP','USD','MXN','EUR','PEN','CLP','ARS','BRL'];
@@ -1543,8 +1573,9 @@ function updateStockInHint(sel) {
     const spot = Number(store.settings?.goldSpotPerGram) || 0;
     if (isJewelry() && Number(p.karat) > 0 && spot > 0) {
       const finePerGram = karatPurity(p.karat) * spot;        // valor del oro fino en 1 g de esta ley
-      const suggested = finePerGram * 0.90;                    // se compra al 90% del spot por defecto
-      extra = ` · 🥇 Oro ${p.karat}K: 1 g = <strong>${formatMoney(finePerGram, currency)}</strong> de oro fino · sugerido de compra (90%): <strong>${formatMoney(suggested, currency)}/g</strong>`;
+      const pct = goldBuyPct();
+      const suggested = finePerGram * (pct / 100);             // se compra al % del spot configurado
+      extra = ` · 🥇 Oro ${p.karat}K: 1 g = <strong>${formatMoney(finePerGram, currency)}</strong> de oro fino · sugerido de compra (${fmtQty(pct)}%): <strong>${formatMoney(suggested, currency)}/g</strong>`;
       if (costInput && Number(costInput.value) === 0) costInput.value = (Math.round(suggested * 100) / 100).toFixed(2);
     } else if (costInput && Number(costInput.value) === 0 && current > 0) {
       costInput.value = current.toFixed(2);
@@ -1670,9 +1701,9 @@ function suggestStockOutPrice(form) {
   const p = store.products.find(x => x.id === form.productId.value);
   if (!p) return;
   const spot = Number(store.settings?.goldSpotPerGram) || 0;
-  // Venta de oro por gramo: precio sugerido = oro fino contenido en 1 g + 25% de taller/fabricación.
+  // Venta de oro por gramo: precio sugerido = oro fino contenido en 1 g + % de taller/fabricación configurado.
   if (isJewelry() && Number(p.karat) > 0 && unitAllowsDecimals(p.unit) && spot > 0) {
-    const perGram = karatPurity(p.karat) * spot * 1.25;
+    const perGram = karatPurity(p.karat) * spot * (1 + goldSellPct() / 100);
     if (Number(input.value) === 0) input.value = (Math.round(perGram * 100) / 100).toFixed(2);
     return;
   }

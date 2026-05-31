@@ -6,3 +6,8 @@
 *.log
 .env
 .mcp.json
+# carpeta de despliegue (es un repo git aparte; el deploy va por GitHub Actions)
+/deploy
+# configuración local de herramientas
+/.claude
+/.specify

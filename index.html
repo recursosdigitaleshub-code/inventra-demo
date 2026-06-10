@@ -344,6 +344,8 @@ const LS_PRODUCTS  = 'inventra.demo.products';
 const LS_MOVEMENTS = 'inventra.demo.movements';
 const LS_USERS     = 'inventra.demo.users';      // lista de usuarios del tenant
 const LS_ACTIVE    = 'inventra.demo.activeUser'; // id del usuario activo (selector)
+const LS_RECIPES   = 'inventra.demo.recipes';    // recetas / escandallos (restaurante)
+const LS_COUNTS    = 'inventra.demo.counts';     // conteos de cierre (merma)
 
 const uid = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
 
@@ -364,6 +366,9 @@ const PERMISSIONS = {
   // Específicos de joyería (alto valor del oro):
   gold_spot:       'Editar la cotización (spot) del oro',
   gold_buy:        'Comprar oro a clientes (oro usado)',
+  // Específicos de restaurante (cocina):
+  recipe_edit:     'Crear / editar recetas y raciones estándar',
+  inventory_count: 'Registrar conteos de cierre (merma)',
 };
 
 // Roles predefinidos. `*` = todos los permisos.
@@ -371,11 +376,11 @@ const ROLES = {
   owner:   { name:'Propietario', icon:'👑', desc:'Acceso total al sistema.',
     perms:'*' },
   manager: { name:'Gerente', icon:'🧑‍💼', desc:'Opera y supervisa; no gestiona usuarios ni borra datos.',
-    perms:['view_dashboard','manage_products','stock_in','stock_out','adjust','view_costs','view_reports','export','settings','gold_spot','gold_buy'] },
+    perms:['view_dashboard','manage_products','stock_in','stock_out','adjust','view_costs','view_reports','export','settings','gold_spot','gold_buy','recipe_edit','inventory_count'] },
   cashier: { name:'Cajero / Vendedor', icon:'🧾', desc:'Registra ventas y consulta stock. No ve costos.',
     perms:['view_dashboard','stock_out','view_reports'] },
   stock:   { name:'Almacenista', icon:'📦', desc:'Recibe mercancía y ajusta conteos.',
-    perms:['view_dashboard','manage_products','stock_in','adjust'] },
+    perms:['view_dashboard','manage_products','stock_in','adjust','inventory_count'] },
   viewer:  { name:'Solo lectura / Auditor', icon:'👁️', desc:'Ve todo, no modifica nada.',
     perms:['view_dashboard','view_costs','view_reports','export'] },
 };
@@ -436,6 +441,7 @@ function can(perm) {
   const role = ROLES[u.role];
   if (!role) return true;
   if ((perm === 'gold_spot' || perm === 'gold_buy') && !isJewelry()) return false;
+  if ((perm === 'recipe_edit' || perm === 'inventory_count') && !isRestaurant()) return false;
   return role.perms === '*' || role.perms.includes(perm);
 }
 
@@ -452,6 +458,7 @@ const VERTICALS = [
   { code:'pharmacy', icon:'💊', name:'Farmacia',     desc:'Medicamentos con lote' },
   { code:'petshop',  icon:'🐾', name:'Mascotas',     desc:'Alimento y accesorios' },
   { code:'jewelry',  icon:'💍', name:'Joyería',      desc:'Oro y piezas por gramo / quilataje' },
+  { code:'restaurant',icon:'🍳', name:'Restaurante',  desc:'Insumos, recetas y costeo de platos' },
   { code:'other',    icon:'📦', name:'Otro',         desc:'Configuración personalizada' },
 ];
 
@@ -651,6 +658,158 @@ function updateGoldPct(field, value) {
   render();
 }
 
+// ============================================================
+// ---------- RESTAURANTE / COCINA ----------
+// El inventario de una cocina son INSUMOS que se compran en una unidad de stock
+// (1 litro de aceite, 1 kg de sal) pero se consumen en una unidad de receta (ml, g).
+// Y no todo insumo se mide igual al cocinar — de ahí el "modo de consumo".
+// ============================================================
+function isRestaurant() { return store.tenant?.vertical === 'restaurant'; }
+
+// Cada insumo declara CÓMO se descuenta cuando se vende un plato:
+//   measured  → cantidad exacta de la receta (leche, harina, carne).
+//   portion   → ración estándar estimada que define el dueño (aceite, mantequilla);
+//               se descuenta el promedio aunque en la práctica varíe.
+//   shrinkage → NO se descuenta por venta; se controla con conteo periódico (sal, especias).
+const CONSUME_MODES = [
+  { k:'measured',  label:'Medido (cantidad exacta)',        icon:'⚖️', hint:'La receta indica la cantidad exacta. Se descuenta tal cual al vender el plato.' },
+  { k:'portion',   label:'Ración estándar (estimado)',      icon:'🥄', hint:'No se pesa al cocinar (ej: aceite para saltear). Defines un consumo promedio por plato.' },
+  { k:'shrinkage', label:'Control por merma (conteo)',      icon:'🧂', hint:'No se descuenta al vender. Se ajusta con el conteo de cierre (sal, especias).' },
+];
+function consumeModeOf(p) {
+  const k = String(p?.consumeMode || '').trim();
+  return CONSUME_MODES.some(m => m.k === k) ? k : 'measured';
+}
+function consumeModeLabel(k) { return (CONSUME_MODES.find(m => m.k === k) || CONSUME_MODES[0]).label; }
+function consumeModeIcon(k)  { return (CONSUME_MODES.find(m => m.k === k) || CONSUME_MODES[0]).icon; }
+
+// Conversión entre la unidad de RECETA y la unidad de STOCK del insumo.
+// Familias soportadas: peso (g↔kg) y volumen (ml↔l). Devuelve cuántas unidades de
+// stock equivale 1 unidad de receta — o null si no hay conversión conocida (misma unidad → 1).
+const UNIT_FAMILIES = [
+  { base:'g',  members:{ 'g':1, 'gr':1, 'gramo':1, 'gramos':1, 'kg':1000, 'kilo':1000, 'kilos':1000 } },
+  { base:'ml', members:{ 'ml':1, 'cc':1, 'l':1000, 'litro':1000, 'litros':1000 } },
+];
+function unitFamily(unit) {
+  const u = String(unit || '').trim().toLowerCase();
+  return UNIT_FAMILIES.find(f => u in f.members) || null;
+}
+// Factor para pasar `qty` expresado en `fromUnit` a su equivalente en `toUnit`.
+// Ej: convertUnits(1,'l','ml') = 1000. Si no son convertibles entre sí → null.
+function convertUnits(qty, fromUnit, toUnit) {
+  const a = String(fromUnit||'').trim().toLowerCase();
+  const b = String(toUnit||'').trim().toLowerCase();
+  if (a === b) return Number(qty) || 0;
+  const fa = unitFamily(a), fb = unitFamily(b);
+  if (!fa || !fb || fa.base !== fb.base) return null; // distinta familia → no convertible
+  return (Number(qty) || 0) * fa.members[a] / fb.members[b];
+}
+
+// ---------- RECETAS (escandallos) ----------
+// Una receta es un plato vendible compuesto de insumos. Cada línea referencia un
+// producto/insumo, una cantidad y la unidad en que la receta expresa esa cantidad.
+//   { id, name, category, price, yields, ingredients:[{productId, qty, unit}] }
+// `yields` = porciones que rinde la receta (para costear por porción). Por defecto 1.
+function recipesList() { return Array.isArray(store.recipes) ? store.recipes : []; }
+function recipeById(id) { return recipesList().find(r => r.id === id) || null; }
+
+function createRecipe(data) {
+  requirePerm('recipe_edit', 'crear recetas');
+  if (!data.name || !data.name.trim()) throw new Error('La receta necesita un nombre.');
+  const r = {
+    id: uid(),
+    name: data.name.trim(),
+    category: (data.category || '').trim(),
+    price: Number(data.price) || 0,
+    yields: Math.max(1, Number(data.yields) || 1),
+    ingredients: Array.isArray(data.ingredients) ? data.ingredients : [],
+    createdAt: new Date().toISOString(),
+  };
+  store.recipes.push(r);
+  save(LS_RECIPES, store.recipes);
+  return r;
+}
+function updateRecipe(id, patch) {
+  requirePerm('recipe_edit', 'editar recetas');
+  const i = recipesList().findIndex(r => r.id === id);
+  if (i < 0) throw new Error('Receta no encontrada.');
+  store.recipes[i] = { ...store.recipes[i], ...patch };
+  if ('yields' in patch) store.recipes[i].yields = Math.max(1, Number(patch.yields) || 1);
+  save(LS_RECIPES, store.recipes);
+}
+function deleteRecipe(id) {
+  requirePerm('recipe_edit', 'eliminar recetas');
+  store.recipes = recipesList().filter(r => r.id !== id);
+  save(LS_RECIPES, store.recipes);
+}
+
+// Costo de una línea de receta = cantidad (convertida a la unidad de stock del insumo) × costo del insumo.
+function ingredientLineCost(line) {
+  const p = store.products.find(x => x.id === line.productId);
+  if (!p) return 0;
+  const inStockUnit = convertUnits(line.qty, line.unit || p.unit, p.unit);
+  const qtyStock = inStockUnit == null ? (Number(line.qty) || 0) : inStockUnit; // sin conversión → asume misma unidad
+  return qtyStock * (costOf(p) || 0);
+}
+// Costo total de una receta (suma de líneas) y costo por porción.
+function recipeCost(r) {
+  return (r.ingredients || []).reduce((a, l) => a + ingredientLineCost(l), 0);
+}
+function recipeCostPerServing(r) {
+  const c = recipeCost(r);
+  const y = Math.max(1, Number(r.yields) || 1);
+  return c / y;
+}
+// Food cost % = costo de insumos / precio de venta. Métrica clave de rentabilidad en cocina.
+function recipeFoodCostPct(r) {
+  const price = Number(r.price) || 0;
+  if (price <= 0) return null;
+  return (recipeCostPerServing(r) / price) * 100;
+}
+function recipeMargin(r) {
+  const price = Number(r.price) || 0;
+  return price - recipeCostPerServing(r);
+}
+
+// Tarjeta resumen del restaurante para el dashboard: recetas, food cost, insumos críticos.
+function restaurantCard(currency) {
+  const recipes = recipesList();
+  const withPrice = recipes.filter(r => (Number(r.price)||0) > 0);
+  const avgFc = withPrice.length ? withPrice.reduce((a,r)=>a+(recipeFoodCostPct(r)||0),0)/withPrice.length : null;
+  // Plato más rentable y menos rentable (por margen por porción) entre los que tienen precio.
+  const ranked = withPrice.map(r => ({ r, m: recipeMargin(r) })).sort((a,b)=>b.m-a.m);
+  const best = ranked[0], worst = ranked.length > 1 ? ranked[ranked.length-1] : null;
+  const shrink = store.products.filter(p => consumeModeOf(p)==='shrinkage');
+  return `
+    <div class="card" style="background:linear-gradient(135deg,#fff4e6,#ffe9d1);border:1px solid #f0b27a;margin-bottom:16px">
+      <div class="row" style="align-items:center;gap:20px;flex-wrap:wrap">
+        <div style="font-size:32px">🍳</div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:700;color:#9a5a1f">Cocina · costeo de platos</div>
+          <div class="hint" style="color:#a86b35">${recipes.length} receta(s) · el inventario se descuenta al vender platos. Controla la sal/especias en el <a href="#count" style="color:#9a5a1f;text-decoration:underline">cierre de inventario</a>.</div>
+        </div>
+        <div style="text-align:center;min-width:120px">
+          <div class="stat-label" style="color:#9a5a1f">Food cost promedio</div>
+          <div style="font-size:22px;font-weight:700;color:${avgFc!=null && avgFc>35 ? 'var(--danger)' : '#9a5a1f'}">${avgFc!=null ? fmtQty(Math.round(avgFc*10)/10)+'%' : '—'}</div>
+        </div>
+        ${best ? `<div style="text-align:center;min-width:140px">
+          <div class="stat-label" style="color:#9a5a1f">Plato más rentable</div>
+          <div style="font-weight:700;color:#9a5a1f">${esc(best.r.name)}</div>
+          <div class="hint" style="color:#a86b35">margen ${formatMoney(best.m, currency)}</div>
+        </div>` : ''}
+        ${worst ? `<div style="text-align:center;min-width:140px">
+          <div class="stat-label" style="color:#9a5a1f">Menor margen</div>
+          <div style="font-weight:700;color:#9a5a1f">${esc(worst.r.name)}</div>
+          <div class="hint" style="color:#a86b35">margen ${formatMoney(worst.m, currency)}</div>
+        </div>` : ''}
+        <div style="min-width:150px">
+          <button class="btn btn-primary" style="width:100%" onclick="navigate('recipes')">📖 Ver recetas</button>
+          ${shrink.length ? `<div class="hint" style="color:#a86b35;text-align:center;margin-top:4px">🧂 ${shrink.length} insumo(s) de merma</div>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
 const CURRENCIES = ['COP','USD','MXN','EUR','PEN','CLP','ARS','BRL'];
 const TIMEZONES  = ['America/Bogota','America/Mexico_City','America/Lima','America/Santiago','America/Buenos_Aires','America/Sao_Paulo','America/New_York','Europe/Madrid'];
 
@@ -706,6 +865,18 @@ function defaultCategoriesFor(vertical) {
       { sku:'ARE-001',name:'Aretes oro 14K (par)',category:'Aretes',      unit:'Unidad', minStock:5,   price:480000, currentStock:12,   karat:14 },
       { sku:'DIA-001',name:'Diamante 0.25ct',     category:'Piedras',     unit:'ct',     minStock:2,   price:2500000,currentStock:5.5,  karat:0  },
     ];
+    case 'restaurant': return [
+      // recipeUnit = unidad en que las recetas miden este insumo; consumeMode = cómo se descuenta.
+      { sku:'ACE-001', name:'Aceite vegetal',     category:'Aceites y grasas', unit:'Litro', minStock:3,  price:0, cost:9000,  currentStock:12,  consumeMode:'portion',   recipeUnit:'ml' },
+      { sku:'SAL-001', name:'Sal refinada',       category:'Condimentos',      unit:'Kg',    minStock:2,  price:0, cost:1800,  currentStock:8,   consumeMode:'shrinkage', recipeUnit:'g' },
+      { sku:'CEB-001', name:'Cebolla cabezona',   category:'Verduras',         unit:'Kg',    minStock:5,  price:0, cost:2500,  currentStock:20,  consumeMode:'measured',  recipeUnit:'g' },
+      { sku:'TOM-001', name:'Tomate',             category:'Verduras',         unit:'Kg',    minStock:5,  price:0, cost:3000,  currentStock:18,  consumeMode:'measured',  recipeUnit:'g' },
+      { sku:'PAS-001', name:'Pasta espagueti',    category:'Abarrotes',        unit:'Kg',    minStock:4,  price:0, cost:4200,  currentStock:15,  consumeMode:'measured',  recipeUnit:'g' },
+      { sku:'LEC-001', name:'Leche entera',       category:'Lácteos',          unit:'Litro', minStock:6,  price:0, cost:3500,  currentStock:20,  consumeMode:'measured',  recipeUnit:'ml' },
+      { sku:'POL-001', name:'Pechuga de pollo',   category:'Carnes',           unit:'Kg',    minStock:5,  price:0, cost:12000, currentStock:14,  consumeMode:'measured',  recipeUnit:'g' },
+      { sku:'AJO-001', name:'Ajo',                category:'Condimentos',      unit:'Kg',    minStock:1,  price:0, cost:9000,  currentStock:3,   consumeMode:'portion',   recipeUnit:'g' },
+      { sku:'GAS-001', name:'Gaseosa 350ml',      category:'Bebidas',          unit:'Unidad',minStock:24, price:3500, cost:1800, currentStock:60, consumeMode:'measured' },
+    ];
     case 'retail': return [
       { sku:'ARR-001', name:'Arroz 1kg',                category:'Abarrotes', unit:'Kg',     minStock:20, price:2.50, currentStock:60 },
       { sku:'AZU-001', name:'Azúcar blanca 1kg',        category:'Abarrotes', unit:'Kg',     minStock:10, price:3.00, currentStock:35 },
@@ -728,6 +899,7 @@ function defaultCategoriesListFor(vertical) {
     pharmacy: ['Analgésicos','Antibióticos','Antihistamínicos','Vitaminas','Higiene personal','Instrumentos','Dermatológicos','Cuidado infantil'],
     petshop:  ['Alimento perros','Alimento gatos','Accesorios','Higiene','Juguetes','Salud animal','Transporte','Acuarios'],
     jewelry:  ['Oro','Anillos','Cadenas','Aretes','Pulseras','Dijes','Piedras','Plata','Relojes','Reparaciones'],
+    restaurant:['Aceites y grasas','Condimentos','Verduras','Frutas','Carnes','Lácteos','Abarrotes','Bebidas','Panadería','Congelados','Desechables'],
     other:    [],
   })[vertical] || [];
 }
@@ -740,6 +912,7 @@ function defaultUnitsListFor(vertical) {
     pharmacy: ['Caja','Unidad','Frasco','Blíster','Ampolla','Tubo'],
     petshop:  ['Bolsa','Unidad','Kg','Lata','Frasco','Caja'],
     jewelry:  ['g','ct','Unidad','Par','Onza'],
+    restaurant:['Kg','g','Litro','ml','Unidad','Docena','Paquete'],
     other:    ['Unidad','Kg','Litro','Paquete','Caja'],
   })[vertical] || ['Unidad'];
 }
@@ -758,6 +931,8 @@ const store = {
   settings:  load(LS_SETTINGS, null),
   products:  load(LS_PRODUCTS, []),
   movements: load(LS_MOVEMENTS, []),
+  recipes:   load(LS_RECIPES, []),
+  counts:    load(LS_COUNTS, []),
 };
 
 function hasTenant() { return !!store.tenant; }
@@ -841,9 +1016,9 @@ function registerMovement(input) {
   return mv;
 }
 function clearAllData() {
-  [LS_TENANT, LS_USER, LS_USERS, LS_ACTIVE, LS_BRANCHES, LS_SETTINGS, LS_PRODUCTS, LS_MOVEMENTS].forEach(k => localStorage.removeItem(k));
+  [LS_TENANT, LS_USER, LS_USERS, LS_ACTIVE, LS_BRANCHES, LS_SETTINGS, LS_PRODUCTS, LS_MOVEMENTS, LS_RECIPES, LS_COUNTS].forEach(k => localStorage.removeItem(k));
   store.tenant = null; store.user = null; store.users = []; store.branches = []; store.settings = null;
-  store.products = []; store.movements = [];
+  store.products = []; store.movements = []; store.recipes = []; store.counts = [];
   onboardingState = { step: 0, data: {} };
 }
 
@@ -1029,6 +1204,8 @@ function finishOnboarding() {
     cost: Number(p.cost) || 0,
     price: Number(p.price) || 0,
     ...(p.karat != null ? { karat: Number(p.karat) || 0 } : {}),
+    ...(p.consumeMode ? { consumeMode: p.consumeMode } : {}),
+    ...(p.recipeUnit ? { recipeUnit: p.recipeUnit } : {}),
     createdAt: now,
   }));
   // Generate "Saldo inicial" movements for products with currentStock > 0
@@ -1081,6 +1258,8 @@ const NAV = [
   { path: 'products',  label: 'Productos',  icon: '📋', perm: 'view_dashboard' },
   { path: 'stock-in',  label: 'Entradas',   icon: '⬇️', perm: 'stock_in' },
   { path: 'stock-out', label: 'Salidas',    icon: '⬆️', perm: 'stock_out' },
+  { path: 'recipes',   label: 'Recetas',    icon: '📖', perm: 'view_dashboard', only: 'restaurant' },
+  { path: 'count',     label: 'Cierre / Merma', icon: '🧮', perm: 'inventory_count', only: 'restaurant' },
   { path: 'movements', label: 'Movimientos',icon: '📜', perm: 'view_dashboard' },
   { path: 'reports',   label: 'Reportes',   icon: '📊', perm: 'view_reports' },
   { path: 'insights',  label: 'Inteligencia',icon:'🧠', perm: 'view_reports' },
@@ -1099,7 +1278,7 @@ function esc(s) {
 
 function renderSidebar() {
   const alerts = lowStockProducts().length;
-  document.getElementById('nav').innerHTML = NAV.filter(n => !n.perm || can(n.perm)).map(n => `
+  document.getElementById('nav').innerHTML = NAV.filter(n => (!n.perm || can(n.perm)) && (!n.only || store.tenant?.vertical === n.only)).map(n => `
     <div class="nav-item ${n.path === currentView ? 'active' : ''}" onclick="navigate('${n.path}')">
       <span class="nav-icon">${n.icon}</span>
       <span class="nav-label">${n.label}</span>
@@ -1124,12 +1303,7 @@ function viewDashboard() {
   const stock = stockByProduct();
   // Valor de inventario: precio de lista × stock. En joyería, si la pieza no tiene precio
   // de lista pero sí ley de oro, se valúa por el oro contenido al spot del día.
-  const invValue = store.products.reduce((a,p) => {
-    const qty = stock[p.id] ?? 0;
-    const byPrice = qty * priceOf(p);
-    if (isJewelry() && byPrice === 0 && Number(p.karat) > 0) return a + goldValue(qty, p.karat);
-    return a + byPrice;
-  }, 0);
+  const invValue = store.products.reduce((a,p) => a + productValue(p, stock[p.id] ?? 0), 0);
   const circ = 2 * Math.PI * 42;
   const offset = circ - (score / 100) * circ;
 
@@ -1147,6 +1321,7 @@ function viewDashboard() {
       </div>
 
       ${isJewelry() ? goldSpotCard(currency) : ''}
+      ${isRestaurant() ? restaurantCard(currency) : ''}
 
       <div class="grid grid-4">
         <div class="stat-card" style="display:flex;gap:14px;align-items:center;cursor:pointer" onclick="navigate('insights')">
@@ -1397,6 +1572,20 @@ function openProductForm(id) {
                 </select>
                 <div class="hint">Define la pureza del oro para valuar la pieza al precio spot.</div>
               </div>` : ''}
+              ${isRestaurant() ? `
+              <div class="field">
+                <label>Modo de consumo</label>
+                <select name="consumeMode">
+                  ${CONSUME_MODES.map(m => `<option value="${m.k}" ${consumeModeOf(editing||{}) === m.k ? 'selected' : ''}>${m.icon} ${m.label}</option>`).join('')}
+                </select>
+                <div class="hint">Cómo se descuenta este insumo al vender un plato. <strong>Ración</strong> para lo que no se pesa (aceite, ajo); <strong>merma</strong> para sal/especias.</div>
+              </div>
+              <div class="field">
+                <label>Unidad de receta</label>
+                <input name="recipeUnit" list="recipe-unit-list" value="${esc(editing?.recipeUnit || '')}" placeholder="Ej: g, ml"/>
+                <datalist id="recipe-unit-list"><option value="g"><option value="ml"><option value="Unidad"></datalist>
+                <div class="hint">Unidad en que las recetas miden este insumo (se compra por ${esc(editing?.unit || 'unidad de stock')}, se consume por esta). El sistema convierte g↔kg y ml↔litro.</div>
+              </div>` : ''}
               <div class="field">
                 <label class="required">Stock mínimo</label>
                 <input type="number" min="0" step="${editing ? qtyStep(editing.unit) : '1'}" name="minStock" id="product-minstock" required value="${editing?.minStock ?? 0}"/>
@@ -1492,6 +1681,8 @@ function submitProduct(e, id) {
     price: Number(f.price.value),
   };
   if (f.karat) data.karat = Number(f.karat.value) || 0;
+  if (f.consumeMode) data.consumeMode = f.consumeMode.value;
+  if (f.recipeUnit) data.recipeUnit = f.recipeUnit.value.trim();
   try {
     if (id) {
       updateProduct(id, data);
@@ -1802,6 +1993,417 @@ function submitStockOut(e) {
     toast(`Salida de ${fmtQty(Number(f.quantity.value))} ${esc(p?.unit || 'unidad(es)')} registrada.`, 'success');
     render();
   } catch (err) { toast(err.message, 'error'); }
+}
+
+// ============================================================
+// ----- Recetas view (solo restaurante)
+// ============================================================
+function viewRecipes() {
+  const currency = store.tenant?.currency || 'COP';
+  const recipes = recipesList();
+  const insumos = store.products; // en restaurante todo producto es un insumo potencial
+
+  // Resumen: food cost promedio (solo recetas con precio definido).
+  const withPrice = recipes.filter(r => (Number(r.price) || 0) > 0);
+  const avgFoodCost = withPrice.length
+    ? withPrice.reduce((a,r) => a + (recipeFoodCostPct(r) || 0), 0) / withPrice.length
+    : null;
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Recetas y costeo de platos</h1>
+          <div class="page-subtitle">Define qué insumos lleva cada plato. El sistema calcula el costo, el margen y descuenta el inventario al vender.</div>
+        </div>
+        ${can('recipe_edit') ? `<button class="btn btn-primary" onclick="openRecipeForm(null)">＋ Nueva receta</button>` : ''}
+      </div>
+
+      <div class="grid grid-4">
+        <div class="stat-card"><div class="stat-label">Recetas</div><div class="stat-value">${recipes.length}</div><div class="stat-hint">platos definidos</div></div>
+        <div class="stat-card"><div class="stat-label">Insumos disponibles</div><div class="stat-value">${insumos.length}</div><div class="stat-hint">en inventario</div></div>
+        <div class="stat-card ${avgFoodCost != null && avgFoodCost > 35 ? 'alert' : 'ok'}">
+          <div class="stat-label">Food cost promedio</div>
+          <div class="stat-value">${avgFoodCost != null ? fmtQty(Math.round(avgFoodCost*10)/10) + '%' : '—'}</div>
+          <div class="stat-hint">${avgFoodCost == null ? 'define precios de venta' : (avgFoodCost > 35 ? '⚠️ alto (>35%)' : 'saludable')}</div>
+        </div>
+        <div class="stat-card"><div class="stat-label">Insumos de merma</div><div class="stat-value">${insumos.filter(p => consumeModeOf(p)==='shrinkage').length}</div><div class="stat-hint">se ajustan en el cierre</div></div>
+      </div>
+
+      <section class="card mt-16">
+        ${recipes.length === 0
+          ? `<div class="empty"><div class="empty-icon">📖</div><strong>Aún no hay recetas</strong><div>Crea tu primera receta para empezar a costear platos y descontar insumos automáticamente.</div></div>`
+          : `<table class="table"><thead><tr>
+              <th>Plato</th><th>Categoría</th><th class="num">Insumos</th><th class="num">Costo / porción</th><th class="num">Precio venta</th><th class="num">Margen</th><th class="num">Food cost</th><th></th>
+            </tr></thead><tbody>
+            ${recipes.map(r => {
+              const cps = recipeCostPerServing(r);
+              const fc = recipeFoodCostPct(r);
+              const mg = recipeMargin(r);
+              const fcBadge = fc == null ? '<span class="text-muted">—</span>'
+                : `<span class="badge ${fc <= 30 ? 'badge-ok' : fc <= 40 ? 'badge-warn' : 'badge-danger'}">${fmtQty(Math.round(fc*10)/10)}%</span>`;
+              return `<tr>
+                <td><div style="font-weight:600">${esc(r.name)}</div><div style="font-size:11px;color:var(--muted)">rinde ${fmtQty(r.yields||1)} porción(es)</div></td>
+                <td>${esc(r.category || '—')}</td>
+                <td class="num">${(r.ingredients||[]).length}</td>
+                <td class="num">${formatMoney(cps, currency)}</td>
+                <td class="num">${(Number(r.price)||0) > 0 ? formatMoney(r.price, currency) : '<span class="text-muted">sin precio</span>'}</td>
+                <td class="num" style="color:${mg >= 0 ? 'var(--ok,#16a34a)' : 'var(--danger)'};font-weight:600">${(Number(r.price)||0) > 0 ? formatMoney(mg, currency) : '—'}</td>
+                <td class="num">${fcBadge}</td>
+                <td class="num" style="white-space:nowrap">
+                  ${can('stock_out') ? `<button class="btn btn-sm btn-primary" onclick="openSellPlato('${r.id}')" title="Vender plato y descontar insumos">🍽️ Vender</button>` : ''}
+                  ${can('recipe_edit') ? `<button class="btn btn-sm" onclick="openRecipeForm('${r.id}')">✎</button>
+                  <button class="btn btn-sm" onclick="confirmDeleteRecipe('${r.id}')">🗑️</button>` : ''}
+                </td>
+              </tr>`;
+            }).join('')}
+            </tbody></table>`}
+      </section>
+    </div>`;
+}
+
+function confirmDeleteRecipe(id) {
+  const r = recipeById(id);
+  if (!r) return;
+  if (!confirm(`¿Eliminar la receta "${r.name}"?`)) return;
+  try { deleteRecipe(id); toast('Receta eliminada.', 'success'); render(); }
+  catch (e) { toast(e.message, 'error'); }
+}
+
+// Borrador en memoria mientras se edita una receta (líneas de insumo).
+let recipeDraft = null;
+
+function openRecipeForm(id) {
+  const editing = id ? recipeById(id) : null;
+  recipeDraft = editing
+    ? { ...editing, ingredients: (editing.ingredients||[]).map(l => ({ ...l })) }
+    : { name:'', category:'', price:0, yields:1, ingredients:[] };
+  renderRecipeModal(id);
+}
+
+function renderRecipeModal(id) {
+  const currency = store.tenant?.currency || 'COP';
+  const d = recipeDraft;
+  const cats = defaultCategoriesListFor('restaurant');
+  const totalCost = (d.ingredients||[]).reduce((a,l) => a + ingredientLineCost(l), 0);
+  const perServing = totalCost / Math.max(1, Number(d.yields)||1);
+  const fc = (Number(d.price)||0) > 0 ? (perServing / d.price) * 100 : null;
+  const margin = (Number(d.price)||0) - perServing;
+
+  const html = `
+    <div class="modal-overlay" onmousedown="this._downOnSelf=(event.target===this)" onmouseup="if(this._downOnSelf&&event.target===this){closeModal()} this._downOnSelf=false">
+      <div class="modal" style="max-width:760px">
+        <div class="modal-header">
+          <h2>${id ? 'Editar receta' : 'Nueva receta'}</h2>
+          <button class="close-x" onclick="closeModal()">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="field"><label class="required">Nombre del plato</label><input id="rcp-name" value="${esc(d.name)}" placeholder="Ej: Pasta a la cebolla" oninput="recipeDraft.name=this.value"/></div>
+            <div class="field"><label>Categoría</label><input id="rcp-cat" list="rcp-cat-list" value="${esc(d.category)}" placeholder="Ej: Principios" oninput="recipeDraft.category=this.value"/><datalist id="rcp-cat-list">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div>
+            <div class="field"><label>Precio de venta (${esc(currency)})</label><input id="rcp-price" type="number" min="0" step="0.01" value="${d.price||0}" oninput="recipeDraft.price=Number(this.value)||0;refreshRecipeTotals()"/></div>
+            <div class="field"><label>Rinde (porciones)</label><input id="rcp-yields" type="number" min="1" step="1" value="${d.yields||1}" oninput="recipeDraft.yields=Math.max(1,Number(this.value)||1);refreshRecipeTotals()"/></div>
+          </div>
+
+          <h3 style="margin:18px 0 8px">Insumos del plato</h3>
+          <div id="rcp-lines">${renderRecipeLines()}</div>
+          <button class="btn btn-sm" style="margin-top:10px" onclick="addRecipeLine()">＋ Agregar insumo</button>
+
+          <div class="card" style="margin-top:16px;background:var(--primary-soft);border:none">
+            <div class="row" style="gap:24px;flex-wrap:wrap;align-items:flex-end">
+              <div><div class="stat-label">Costo total</div><div id="rcp-total" style="font-size:18px;font-weight:700">${formatMoney(totalCost, currency)}</div></div>
+              <div><div class="stat-label">Costo / porción</div><div id="rcp-perserv" style="font-size:18px;font-weight:700">${formatMoney(perServing, currency)}</div></div>
+              <div><div class="stat-label">Margen / porción</div><div id="rcp-margin" style="font-size:18px;font-weight:700">${(Number(d.price)||0)>0 ? formatMoney(margin, currency) : '—'}</div></div>
+              <div><div class="stat-label">Food cost</div><div id="rcp-fc" style="font-size:18px;font-weight:700">${fc!=null ? fmtQty(Math.round(fc*10)/10)+'%' : '—'}</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+          <button type="button" class="btn btn-primary" onclick="saveRecipe(${id?`'${id}'`:'null'})">${id ? 'Guardar cambios' : 'Crear receta'}</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-root').innerHTML = html;
+}
+
+function renderRecipeLines() {
+  const currency = store.tenant?.currency || 'COP';
+  const d = recipeDraft;
+  if (!d.ingredients.length) return `<div class="hint">Aún no hay insumos. Agrega al menos uno para costear el plato.</div>`;
+  return d.ingredients.map((l, i) => {
+    const p = store.products.find(x => x.id === l.productId);
+    const defaultUnit = p ? (p.recipeUnit || p.unit) : '';
+    const lineCost = ingredientLineCost(l);
+    const mode = p ? consumeModeOf(p) : 'measured';
+    const modeNote = mode === 'shrinkage'
+      ? ` <span class="badge badge-warn" title="No se descuenta al vender; se ajusta en el cierre">🧂 merma</span>`
+      : mode === 'portion' ? ` <span class="badge" title="Ración estándar estimada">🥄 ración</span>` : '';
+    return `
+    <div class="row" style="gap:8px;align-items:flex-end;margin-bottom:8px;flex-wrap:wrap">
+      <div class="field" style="flex:2;min-width:180px;margin:0">
+        <label>Insumo</label>
+        <select onchange="setRecipeLineProduct(${i}, this.value)">
+          <option value="">Seleccionar…</option>
+          ${store.products.map(pp => `<option value="${pp.id}" ${l.productId===pp.id?'selected':''}>${esc(pp.name)} (${esc(pp.unit)})</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="flex:1;min-width:90px;margin:0">
+        <label>Cantidad</label>
+        <input type="number" min="0" step="0.01" value="${l.qty ?? ''}" oninput="setRecipeLineQty(${i}, this.value)"/>
+      </div>
+      <div class="field" style="flex:1;min-width:80px;margin:0">
+        <label>Unidad</label>
+        <input value="${esc(l.unit || defaultUnit)}" oninput="setRecipeLineUnit(${i}, this.value)" placeholder="${esc(defaultUnit||'g')}"/>
+      </div>
+      <div style="flex:1;min-width:110px;text-align:right">
+        <div class="stat-label">Costo${modeNote}</div>
+        <div style="font-weight:600">${formatMoney(lineCost, currency)}</div>
+      </div>
+      <button class="btn btn-sm" onclick="removeRecipeLine(${i})" title="Quitar">✕</button>
+    </div>`;
+  }).join('');
+}
+
+function addRecipeLine() { recipeDraft.ingredients.push({ productId:'', qty:0, unit:'' }); refreshRecipeLines(); }
+function removeRecipeLine(i) { recipeDraft.ingredients.splice(i,1); refreshRecipeLines(); }
+function setRecipeLineProduct(i, pid) {
+  recipeDraft.ingredients[i].productId = pid;
+  const p = store.products.find(x => x.id === pid);
+  if (p && !recipeDraft.ingredients[i].unit) recipeDraft.ingredients[i].unit = p.recipeUnit || p.unit;
+  refreshRecipeLines();
+}
+function setRecipeLineQty(i, v) { recipeDraft.ingredients[i].qty = Number(v) || 0; refreshRecipeTotals(); refreshLineCost(i); }
+function setRecipeLineUnit(i, v) { recipeDraft.ingredients[i].unit = v.trim(); refreshRecipeTotals(); refreshLineCost(i); }
+function refreshRecipeLines() { const el = document.getElementById('rcp-lines'); if (el) el.innerHTML = renderRecipeLines(); refreshRecipeTotals(); }
+function refreshLineCost(/*i*/) { refreshRecipeLines(); }
+function refreshRecipeTotals() {
+  const currency = store.tenant?.currency || 'COP';
+  const d = recipeDraft; if (!d) return;
+  const total = (d.ingredients||[]).reduce((a,l) => a + ingredientLineCost(l), 0);
+  const perServing = total / Math.max(1, Number(d.yields)||1);
+  const fc = (Number(d.price)||0) > 0 ? (perServing / d.price) * 100 : null;
+  const margin = (Number(d.price)||0) - perServing;
+  const set = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+  set('rcp-total', formatMoney(total, currency));
+  set('rcp-perserv', formatMoney(perServing, currency));
+  set('rcp-margin', (Number(d.price)||0)>0 ? formatMoney(margin, currency) : '—');
+  set('rcp-fc', fc!=null ? fmtQty(Math.round(fc*10)/10)+'%' : '—');
+}
+
+function saveRecipe(id) {
+  const d = recipeDraft;
+  if (!d.name || !d.name.trim()) { toast('La receta necesita un nombre.', 'error'); return; }
+  const clean = (d.ingredients||[]).filter(l => l.productId && (Number(l.qty)||0) > 0);
+  try {
+    if (id) updateRecipe(id, { name:d.name, category:d.category, price:Number(d.price)||0, yields:d.yields, ingredients:clean });
+    else createRecipe({ ...d, ingredients:clean });
+    toast(id ? 'Receta actualizada.' : 'Receta creada.', 'success');
+    recipeDraft = null;
+    closeModal();
+    render();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ----- Venta de plato: descuenta los insumos measured/portion del inventario.
+function openSellPlato(id) {
+  const r = recipeById(id);
+  if (!r) return;
+  const currency = store.tenant?.currency || 'COP';
+  // Pre-cálculo de qué se descuenta y si hay stock suficiente, por nº de platos = 1.
+  const html = `
+    <div class="modal-overlay" onmousedown="this._downOnSelf=(event.target===this)" onmouseup="if(this._downOnSelf&&event.target===this){closeModal()} this._downOnSelf=false">
+      <div class="modal" style="max-width:560px">
+        <div class="modal-header"><h2>🍽️ Vender "${esc(r.name)}"</h2><button class="close-x" onclick="closeModal()">✕</button></div>
+        <div class="modal-body">
+          <div class="field"><label class="required">¿Cuántos platos?</label>
+            <input id="plato-qty" type="number" min="1" step="1" value="1" oninput="refreshPlatoPreview('${id}')"/>
+          </div>
+          <div class="hint" style="margin-bottom:10px">Se descontarán del inventario los insumos <strong>medidos</strong> y de <strong>ración estándar</strong>. Los de <strong>merma</strong> (🧂) se ajustan en el cierre, no aquí.</div>
+          <div id="plato-preview">${renderPlatoPreview(r, 1, currency)}</div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn" onclick="closeModal()">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="plato-confirm" onclick="confirmSellPlato('${id}')">Confirmar venta</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-root').innerHTML = html;
+}
+
+// Calcula, para n platos, qué cantidad (en unidad de stock) descuenta cada insumo y si alcanza.
+function platoDeductions(r, n) {
+  const out = [];
+  for (const l of (r.ingredients||[])) {
+    const p = store.products.find(x => x.id === l.productId);
+    if (!p) continue;
+    const mode = consumeModeOf(p);
+    if (mode === 'shrinkage') { out.push({ p, mode, skip:true }); continue; }
+    const inStock = convertUnits(l.qty, l.unit || p.unit, p.unit);
+    const perPlato = inStock == null ? (Number(l.qty)||0) : inStock;
+    const need = perPlato * n;
+    const avail = stockOf(p.id);
+    out.push({ p, mode, need, avail, enough: need <= avail, recipeQty: l.qty, recipeUnit: l.unit || p.unit });
+  }
+  return out;
+}
+
+function renderPlatoPreview(r, n, currency) {
+  const ded = platoDeductions(r, n);
+  if (!ded.length) return `<div class="hint">Esta receta no tiene insumos.</div>`;
+  const rows = ded.map(d => {
+    if (d.skip) return `<tr><td>${esc(d.p.name)} 🧂</td><td class="num text-muted" colspan="2">merma — no se descuenta</td></tr>`;
+    return `<tr>
+      <td>${esc(d.p.name)} ${consumeModeIcon(d.mode)}</td>
+      <td class="num">−${fmtQty(Math.round(d.need*1000)/1000)} ${esc(d.p.unit)}</td>
+      <td class="num">${d.enough ? `<span class="badge badge-ok">ok</span>` : `<span class="badge badge-danger">faltan ${fmtQty(Math.round((d.need-d.avail)*1000)/1000)}</span>`}</td>
+    </tr>`;
+  }).join('');
+  const cost = recipeCostPerServing(r) * n;
+  const revenue = (Number(r.price)||0) * n;
+  return `<table class="table"><thead><tr><th>Insumo</th><th class="num">Descuento</th><th class="num">Stock</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="row" style="gap:20px;margin-top:10px;justify-content:flex-end">
+      <div style="text-align:right"><div class="stat-label">Costo insumos</div><div style="font-weight:600">${formatMoney(cost, currency)}</div></div>
+      ${revenue>0?`<div style="text-align:right"><div class="stat-label">Ingreso</div><div style="font-weight:600">${formatMoney(revenue, currency)}</div></div>
+      <div style="text-align:right"><div class="stat-label">Margen</div><div style="font-weight:700;color:var(--ok,#16a34a)">${formatMoney(revenue-cost, currency)}</div></div>`:''}
+    </div>`;
+}
+
+function refreshPlatoPreview(id) {
+  const r = recipeById(id); if (!r) return;
+  const currency = store.tenant?.currency || 'COP';
+  const n = Math.max(1, Number(document.getElementById('plato-qty')?.value)||1);
+  const el = document.getElementById('plato-preview');
+  if (el) el.innerHTML = renderPlatoPreview(r, n, currency);
+  const ded = platoDeductions(r, n);
+  const blocked = ded.some(d => !d.skip && !d.enough);
+  const btn = document.getElementById('plato-confirm');
+  if (btn) { btn.disabled = blocked; btn.title = blocked ? 'No hay stock suficiente de algún insumo' : ''; }
+}
+
+function confirmSellPlato(id) {
+  const r = recipeById(id); if (!r) return;
+  const n = Math.max(1, Number(document.getElementById('plato-qty')?.value)||1);
+  const ded = platoDeductions(r, n);
+  const blocked = ded.filter(d => !d.skip && !d.enough);
+  if (blocked.length) { toast(`Sin stock suficiente: ${blocked.map(d=>d.p.name).join(', ')}.`, 'error'); return; }
+  try {
+    requirePerm('stock_out', 'registrar salidas');
+    const ref = 'PLT-' + Date.now().toString(36).slice(-5).toUpperCase();
+    // Una salida por cada insumo descontable. Los de merma no generan movimiento.
+    ded.filter(d => !d.skip && d.need > 0).forEach(d => {
+      registerMovement({
+        productId: d.p.id, type: 'out', quantity: d.need,
+        reason: `Venta de plato: ${r.name}`,
+        reference: ref + ` ×${n}`,
+      });
+    });
+    toast(`Venta de ${n} "${r.name}" registrada. Insumos descontados.`, 'success');
+    closeModal();
+    render();
+  } catch (e) { toast(e.message, 'error'); }
+}
+
+// ============================================================
+// ----- Cierre / Conteo de inventario (merma)
+// Cierra el círculo del modelo híbrido: el usuario cuenta físicamente lo que queda,
+// el sistema calcula consumo real vs. teórico y registra el ajuste por merma.
+// ============================================================
+function viewCount() {
+  const currency = store.tenant?.currency || 'COP';
+  // Se prioriza el conteo de insumos de merma y ración, pero se permite cualquiera.
+  const insumos = [...store.products].sort((a,b) => {
+    const order = { shrinkage:0, portion:1, measured:2 };
+    return (order[consumeModeOf(a)] ?? 3) - (order[consumeModeOf(b)] ?? 3);
+  });
+  const lastCount = (store.counts||[]).slice(-1)[0];
+
+  return `
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Cierre de inventario (conteo de merma)</h1>
+          <div class="page-subtitle">Cuenta lo que físicamente queda. El sistema calcula el consumo real y ajusta el inventario — así se controla lo que no se descuenta por receta (sal, especias, aceite).</div>
+        </div>
+        ${lastCount ? `<div class="text-muted" style="font-size:12px">Último cierre: ${formatDate(lastCount.createdAt)}</div>` : ''}
+      </div>
+
+      <section class="card">
+        <form onsubmit="submitCount(event)">
+          <table class="table"><thead><tr>
+            <th>Insumo</th><th>Modo</th><th class="num">Stock teórico</th><th class="num" style="width:140px">Conteo físico</th><th class="num">Desviación</th>
+          </tr></thead><tbody>
+          ${insumos.map(p => {
+            const theo = stockOf(p.id);
+            const mode = consumeModeOf(p);
+            const badge = mode==='shrinkage' ? '<span class="badge badge-warn">🧂 merma</span>' : mode==='portion' ? '<span class="badge">🥄 ración</span>' : '<span class="badge badge-ok">⚖️ medido</span>';
+            return `<tr>
+              <td><div style="font-weight:500">${esc(p.name)}</div><div style="font-size:11px;color:var(--muted)">${esc(p.sku)}</div></td>
+              <td>${badge}</td>
+              <td class="num" id="theo-${p.id}" data-theo="${theo}">${fmtQty(theo)} ${esc(p.unit)}</td>
+              <td class="num"><input type="number" min="0" step="${qtyStep(p.unit)}" data-pid="${p.id}" class="count-input" placeholder="${fmtQty(theo)}" style="width:120px;text-align:right" oninput="updateCountDeviation('${p.id}')"/></td>
+              <td class="num" id="dev-${p.id}"><span class="text-muted">—</span></td>
+            </tr>`;
+          }).join('')}
+          </tbody></table>
+          <div class="hint" style="margin:12px 0">Deja en blanco los insumos que no contaste — no se ajustan. La desviación negativa se registra como <strong>merma</strong>; la positiva como <strong>ajuste (+)</strong>.</div>
+          <div class="row" style="justify-content:flex-end">
+            <button type="submit" class="btn btn-primary">🧮 Aplicar conteo y ajustar inventario</button>
+          </div>
+        </form>
+      </section>
+    </div>`;
+}
+
+function updateCountDeviation(pid) {
+  const input = document.querySelector(`.count-input[data-pid="${pid}"]`);
+  const cell = document.getElementById('dev-' + pid);
+  const theoCell = document.getElementById('theo-' + pid);
+  if (!input || !cell || !theoCell) return;
+  const theo = Number(theoCell.dataset.theo) || 0;
+  if (input.value === '') { cell.innerHTML = '<span class="text-muted">—</span>'; return; }
+  const phys = Number(input.value) || 0;
+  const dev = phys - theo; // negativo = consumo/merma
+  const color = dev < 0 ? 'var(--danger)' : dev > 0 ? 'var(--ok,#16a34a)' : 'var(--muted)';
+  const sign = dev > 0 ? '+' : '';
+  cell.innerHTML = `<span style="color:${color};font-weight:600">${sign}${fmtQty(Math.round(dev*1000)/1000)}</span>`;
+}
+
+function submitCount(e) {
+  e.preventDefault();
+  try { requirePerm('inventory_count', 'registrar conteos'); }
+  catch (err) { toast(err.message, 'error'); return; }
+  const inputs = [...document.querySelectorAll('.count-input')];
+  const adjustments = [];
+  inputs.forEach(inp => {
+    if (inp.value === '') return;
+    const pid = inp.dataset.pid;
+    const phys = Number(inp.value) || 0;
+    const theo = stockOf(pid);
+    const dev = Math.round((phys - theo) * 1000) / 1000;
+    if (dev === 0) return;
+    adjustments.push({ pid, dev, theo, phys });
+  });
+  if (!adjustments.length) { toast('No hay diferencias que ajustar.', 'info'); return; }
+  const ref = 'CIERRE-' + Date.now().toString(36).slice(-5).toUpperCase();
+  let applied = 0;
+  adjustments.forEach(a => {
+    try {
+      registerMovement({
+        productId: a.pid,
+        type: a.dev < 0 ? 'adjust_neg' : 'adjust_pos',
+        quantity: Math.abs(a.dev),
+        reason: a.dev < 0 ? 'Merma (cierre de inventario)' : 'Ajuste por conteo (cierre)',
+        reference: ref,
+      });
+      applied++;
+    } catch (err) { /* p. ej. ajuste sin permiso 'adjust' — se informa abajo */ }
+  });
+  // Guarda el registro del cierre para histórico.
+  store.counts.push({ id: uid(), createdAt: new Date().toISOString(), reference: ref, lines: adjustments });
+  save(LS_COUNTS, store.counts);
+  toast(`Cierre aplicado: ${applied} ajuste(s) registrado(s).`, applied ? 'success' : 'error');
+  render();
 }
 
 // ----- Movements view
@@ -4133,6 +4735,8 @@ function render() {
     'products':  viewProducts,
     'stock-in':  viewStockIn,
     'stock-out': viewStockOut,
+    'recipes':   viewRecipes,
+    'count':     viewCount,
     'movements': viewMovements,
     'reports':   viewReports,
     'insights':  viewInsights,
@@ -4141,6 +4745,11 @@ function render() {
   };
   // Bloqueo de acceso: si el rol activo no tiene permiso para la vista, redirige al dashboard.
   const navItem = NAV.find(n => n.path === currentView);
+  if (navItem && navItem.only && store.tenant?.vertical !== navItem.only) {
+    document.getElementById('main').innerHTML = `<div class="page"><div class="empty" style="padding:48px"><div class="empty-icon">🚫</div><strong>Sección no disponible</strong><div>“${esc(navItem.label)}” solo aplica a negocios de tipo Restaurante.</div></div></div>`;
+    renderChat();
+    return;
+  }
   if (navItem && navItem.perm && !can(navItem.perm)) {
     document.getElementById('main').innerHTML = `<div class="page"><div class="empty" style="padding:48px"><div class="empty-icon">🔒</div><strong>Sin acceso a esta sección</strong><div>Tu perfil (${esc(roleLabel(activeUser()?.role))}) no tiene permiso para ver “${esc(navItem.label)}”.</div></div></div>`;
     renderChat();
